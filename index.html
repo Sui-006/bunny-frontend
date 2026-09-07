@@ -706,6 +706,10 @@
       </h3>
       <p class="api-hint">让 AI 不等你说话，自己主动来一条：定时问候（每天早上问候）＋ 空闲提醒（你很久没聊时关心你）。由外部定时器/打开页面时触发。</p>
       <div class="settings-group">
+        <label>Bark 通知地址（AI 主动发消息时推送到你手机）</label>
+        <input type="text" id="barkUrlInput" placeholder="https://api.day.app/你的Key">
+      </div>
+      <div class="settings-group">
         <label>总开关</label>
         <select id="proactiveEnabledSelect">
           <option value="0">关闭</option>
@@ -1216,6 +1220,7 @@
         document.getElementById('proactiveGreetingTimeInput').value = s.proactive_greeting_time || '08:00';
         document.getElementById('proactiveGreetingPromptInput').value = s.proactive_greeting_prompt || '';
         document.getElementById('proactiveIdleHoursInput').value = (s.proactive_idle_hours == null ? '' : s.proactive_idle_hours);
+        document.getElementById('barkUrlInput').value = s.bark_url || '';
       }
     } catch (e) {}
   }
@@ -1230,6 +1235,7 @@
       proactive_greeting_time: document.getElementById('proactiveGreetingTimeInput').value,
       proactive_greeting_prompt: document.getElementById('proactiveGreetingPromptInput').value.trim(),
       proactive_idle_hours: idleRaw === '' ? null : Number(idleRaw),
+      bark_url: document.getElementById('barkUrlInput').value.trim(),
     };
     try {
       const resp = await fetch(`${API_BASE}/api/settings`, {

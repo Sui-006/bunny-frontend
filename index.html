@@ -546,6 +546,7 @@
     <button class="settings-btn" onclick="openSettings()">⚙️ 对话设置</button>
     <button class="settings-btn" onclick="openProfile()">👤 我的主页</button>
     <button class="settings-btn" onclick="openApiSettings()">🔑 API 设置</button>
+    <button class="settings-btn" onclick="openProactive()">💬 主动消息</button>
   </aside>
 
   <main class="main" id="mainArea">
@@ -694,6 +695,43 @@
         </select>
       </div>
       <button class="settings-save" onclick="saveApiSettings()">保存密钥</button>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="proactivePanel">
+    <div class="settings-card">
+      <h3>
+        💬 主动消息
+        <button onclick="closeProactive()">✕</button>
+      </h3>
+      <p class="api-hint">让 AI 不等你说话，自己主动来一条：定时问候（每天早上问候）＋ 空闲提醒（你很久没聊时关心你）。由外部定时器/打开页面时触发。</p>
+      <div class="settings-group">
+        <label>总开关</label>
+        <select id="proactiveEnabledSelect">
+          <option value="0">关闭</option>
+          <option value="1">开启</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>定时问候</label>
+        <select id="proactiveGreetingEnabledSelect">
+          <option value="0">关闭</option>
+          <option value="1">开启</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>问候时间（每天）</label>
+        <input type="time" id="proactiveGreetingTimeInput" value="08:00">
+      </div>
+      <div class="settings-group">
+        <label>自定义问候语（可选，留空用默认）</label>
+        <textarea id="proactiveGreetingPromptInput" placeholder="例如：每天早上主动跟我说早安，语气温柔一点"></textarea>
+      </div>
+      <div class="settings-group">
+        <label>空闲提醒：几小时没消息触发（留空 = 关闭）</label>
+        <input type="number" id="proactiveIdleHoursInput" min="1" max="720" placeholder="例如：6">
+      </div>
+      <button class="settings-save" onclick="saveProactive()">保存设置</button>
     </div>
   </div>
 </div>
@@ -1166,6 +1204,63 @@
     }
   }
 
+  // ---- 主动消息 ----
+  async function openProactive() {
+    document.getElementById('proactivePanel').classList.add('show');
+    try {
+      const resp = await fetch(`${API_BASE}/api/settings`);
+      if (resp.ok) {
+        const s = (await resp.json()).settings || {};
+        document.getElementById('proactiveEnabledSelect').value = s.proactive_enabled ? '1' : '0';
+        document.getElementById('proactiveGreetingEnabledSelect').value = s.proactive_greeting_enabled ? '1' : '0';
+        document.getElementById('proactiveGreetingTimeInput').value = s.proactive_greeting_time || '08:00';
+        document.getElementById('proactiveGreetingPromptInput').value = s.proactive_greeting_prompt || '';
+        document.getElementById('proactiveIdleHoursInput').value = (s.proactive_idle_hours == null ? '' : s.proactive_idle_hours);
+      }
+    } catch (e) {}
+  }
+  function closeProactive() {
+    document.getElementById('proactivePanel').classList.remove('show');
+  }
+  async function saveProactive() {
+    const idleRaw = document.getElementById('proactiveIdleHoursInput').value.trim();
+    const body = {
+      proactive_enabled: document.getElementById('proactiveEnabledSelect').value === '1',
+      proactive_greeting_enabled: document.getElementById('proactiveGreetingEnabledSelect').value === '1',
+      proactive_greeting_time: document.getElementById('proactiveGreetingTimeInput').value,
+      proactive_greeting_prompt: document.getElementById('proactiveGreetingPromptInput').value.trim(),
+      proactive_idle_hours: idleRaw === '' ? null : Number(idleRaw),
+    };
+    try {
+      const resp = await fetch(`${API_BASE}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      closeProactive();
+      alert('主动消息设置已保存 ✓');
+    } catch (e) {
+      alert('保存失败：' + e.message);
+    }
+  }
+
+  // 打开页面时触发一次心跳：若 AI 刚主动发了消息，刷新会话与消息
+  async function checkProactive() {
+    try {
+      const resp = await fetch(`${API_BASE}/api/proactive`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.sent) return;
+      await loadSessions();
+      renderChatList();
+      if (data.sessionId === currentSessionId) {
+        await loadMessages();
+        renderMessages();
+      }
+    } catch (e) {}
+  }
+
   // ---- 附件 ----
   attachBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', function(e) {
@@ -1321,6 +1416,7 @@
       renderChatList();
       await loadMessages();
       renderMessages();
+      checkProactive();   // 心跳：打开页面时让 AI 有机会主动来一条
     } catch (e) {
       messages = [{ role: 'assistant', content: '连接服务器失败：' + e.message + '。可能是免费实例冷启动中，稍等几秒后刷新页面重试。', time: '', error: true }];
       renderMessages();

@@ -658,6 +658,17 @@
     .edit-card .edit-actions button { padding: 8px 16px; border: none; border-radius: 12px; cursor: pointer; font-size: 14px; }
     .edit-card .edit-cancel { background: #eef3f9; color: #5a6a7a; }
     .edit-card .edit-confirm { background: var(--accent-soft); color: #fff; }
+    /* ---- 计划板块 ---- */
+    .plan-list { display: flex; flex-direction: column; gap: 6px; }
+    .plan-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--accent-tint); border-radius: 10px; }
+    .plan-item input[type="checkbox"] { width: 16px; height: 16px; flex: none; padding: 0; border: none; background: none; accent-color: var(--accent-strong); cursor: pointer; }
+    .plan-item .plan-text { flex: 1; font-size: 14px; color: #4a5a6a; word-break: break-word; }
+    .plan-item .plan-text.done { text-decoration: line-through; opacity: 0.55; }
+    .plan-item .plan-del { background: none; border: none; color: #c0c8d2; cursor: pointer; font-size: 16px; flex: none; }
+    .plan-item .plan-del:hover { color: #e06c6c; }
+    .plan-add { display: flex; gap: 6px; margin-top: 8px; }
+    .plan-add input { flex: 1; width: auto; border: 1px solid #e2ecf4; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-family: inherit; background: #fcfaff; color: #4a5a6a; }
+    .plan-add button { width: auto; flex: none; margin-top: 0; padding: 8px 14px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -679,6 +690,7 @@
     <button class="settings-btn" onclick="openProfile()">我的主页</button>
     <button class="settings-btn" onclick="openApiSettings()">API 设置</button>
     <button class="settings-btn" onclick="openProactive()">主动消息</button>
+    <button class="settings-btn" onclick="openPlans()">计划</button>
   </aside>
 
   <main class="main" id="mainArea">
@@ -940,6 +952,40 @@
         <button class="settings-save" onclick="addMcp()" style="margin-top:8px;">添加插件</button>
       </div>
       <p class="api-hint">插件配置保存在服务器，安装后 AI 回复时可自动调用其工具（需模型支持 function calling）。</p>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="plansPanel">
+    <div class="settings-card">
+      <h3>
+        📋 计划
+        <button onclick="closePlans()">✕</button>
+      </h3>
+      <p class="api-hint">待办事项 / 本月计划 / 年度计划，勾选表示完成。</p>
+      <div class="settings-group">
+        <label>✅ 待办事项</label>
+        <div class="plan-list" id="todoList"></div>
+        <div class="plan-add">
+          <input type="text" id="todoInput" placeholder="添加待办…" onkeydown="planInputKey(event,'todo')">
+          <button class="settings-save" onclick="addPlan('todo')">添加</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <label>📅 本月计划</label>
+        <div class="plan-list" id="monthList"></div>
+        <div class="plan-add">
+          <input type="text" id="monthInput" placeholder="添加本月计划…" onkeydown="planInputKey(event,'month')">
+          <button class="settings-save" onclick="addPlan('month')">添加</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <label>🎯 年度计划</label>
+        <div class="plan-list" id="yearList"></div>
+        <div class="plan-add">
+          <input type="text" id="yearInput" placeholder="添加年度计划…" onkeydown="planInputKey(event,'year')">
+          <button class="settings-save" onclick="addPlan('year')">添加</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1706,6 +1752,92 @@
     mcpServers.splice(i, 1);
     renderMcpList();
     saveMcpServers();
+  }
+
+  // ---- 计划板块（待办 / 本月 / 年度）----
+  let plans = { todo: [], month: [], year: [] };
+
+  async function openPlans() {
+    document.getElementById('plansPanel').classList.add('show');
+    try {
+      const resp = await fetch(`${API_BASE}/api/plans`);
+      if (resp.ok) {
+        const all = (await resp.json()).plans || [];
+        plans = { todo: [], month: [], year: [] };
+        all.forEach((p) => { if (plans[p.category]) plans[p.category].push(p); });
+      }
+    } catch (e) {}
+    renderPlans();
+  }
+  function closePlans() {
+    document.getElementById('plansPanel').classList.remove('show');
+  }
+  function renderPlans() {
+    for (const cat of ['todo', 'month', 'year']) {
+      const el = document.getElementById(cat + 'List');
+      el.innerHTML = '';
+      if ((plans[cat] || []).length === 0) {
+        el.innerHTML = '<div class="api-hint" style="margin:0;">还没有内容</div>';
+        continue;
+      }
+      plans[cat].forEach((p) => {
+        const item = document.createElement('div');
+        item.className = 'plan-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = Boolean(p.done);
+        cb.onchange = () => togglePlan(p, cb.checked);
+        const txt = document.createElement('span');
+        txt.className = 'plan-text' + (p.done ? ' done' : '');
+        txt.textContent = p.content;
+        const del = document.createElement('button');
+        del.className = 'plan-del';
+        del.textContent = '×';
+        del.onclick = () => removePlan(p);
+        item.appendChild(cb);
+        item.appendChild(txt);
+        item.appendChild(del);
+        el.appendChild(item);
+      });
+    }
+  }
+  async function addPlan(cat) {
+    const input = document.getElementById(cat + 'Input');
+    const content = input.value.trim();
+    if (!content) return;
+    try {
+      const resp = await fetch(`${API_BASE}/api/plans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: cat, content }),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const plan = (await resp.json()).plan;
+      plans[cat].push(plan);
+      input.value = '';
+      renderPlans();
+    } catch (e) { alert('添加失败：' + e.message); }
+  }
+  async function togglePlan(p, done) {
+    p.done = done;
+    renderPlans();
+    try {
+      await fetch(`${API_BASE}/api/plans/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done }),
+      });
+    } catch (e) { console.warn('更新计划失败', e); }
+  }
+  async function removePlan(p) {
+    plans[p.category] = (plans[p.category] || []).filter((x) => x.id !== p.id);
+    renderPlans();
+    try {
+      await fetch(`${API_BASE}/api/plans/${p.id}`, { method: 'DELETE' });
+    } catch (e) { console.warn('删除计划失败', e); }
+  }
+  function planInputKey(e, cat) {
+    if (e.key === 'Enter') { e.preventDefault(); addPlan(cat); }
   }
 
   // ---- 个人主页（整页）：头像 / 昵称 / 个性签名 ----

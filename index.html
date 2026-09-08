@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>我们的家</title>
+  <title>Bunny's Home</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -471,6 +471,15 @@
       background: #f4f8fc;
       font-size: 14px;
     }
+    .settings-group .bg-preview {
+      margin-top: 8px;
+      width: 100%;
+      height: 90px;
+      border-radius: 12px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid #e2ecf4;
+    }
     .settings-save {
       width: 100%;
       padding: 10px;
@@ -600,15 +609,15 @@
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="logo">
-      🏠 我们的家
+      🐰 Bunny's Home
       <button class="close-btn" onclick="toggleSidebar()">✕</button>
     </div>
     <button class="new-chat" onclick="newChat(); toggleSidebar();">＋ 新的对话</button>
     <div class="chat-list" id="chatList"></div>
-    <button class="settings-btn" onclick="openSettings()">⚙️ 对话设置</button>
-    <button class="settings-btn" onclick="openProfile()">👤 我的主页</button>
-    <button class="settings-btn" onclick="openApiSettings()">🔑 API 设置</button>
-    <button class="settings-btn" onclick="openProactive()">💬 主动消息</button>
+    <button class="settings-btn" onclick="openSettings()">对话设置</button>
+    <button class="settings-btn" onclick="openProfile()">我的主页</button>
+    <button class="settings-btn" onclick="openApiSettings()">API 设置</button>
+    <button class="settings-btn" onclick="openProactive()">主动消息</button>
   </aside>
 
   <main class="main" id="mainArea">
@@ -660,21 +669,10 @@
         <label>助手头像</label>
         <div class="file-input-wrap">
           <span class="file-label">📁 选择图片</span>
-          <input type="file" id="assistantAvatarInput" accept="image/*">
+          <input type="file" id="assistantAvatarInput" accept="image/*" onchange="previewAssistantAvatar(this)">
         </div>
         <div class="avatar-preview">
           <img id="assistantAvatarPreview" src="" alt="预览" style="display:none;">
-          <span style="font-size:12px;color:#8b9aae;">建议正方形</span>
-        </div>
-      </div>
-      <div class="settings-group">
-        <label>我的头像</label>
-        <div class="file-input-wrap">
-          <span class="file-label">📁 选择图片</span>
-          <input type="file" id="userAvatarInput" accept="image/*">
-        </div>
-        <div class="avatar-preview">
-          <img id="userAvatarPreview" src="" alt="预览" style="display:none;">
           <span style="font-size:12px;color:#8b9aae;">建议正方形</span>
         </div>
       </div>
@@ -690,8 +688,9 @@
         <label>聊天背景</label>
         <div class="file-input-wrap">
           <span class="file-label">📁 选择背景图片</span>
-          <input type="file" id="bgFileInput" accept="image/*">
+          <input type="file" id="bgFileInput" accept="image/*" onchange="previewBackground(this)">
         </div>
+        <div class="bg-preview" id="bgPreview" style="display:none;"></div>
       </div>
       <div class="settings-group">
         <label>气泡透明度：<span id="opacityValue">0.9</span></label>
@@ -775,17 +774,10 @@
         💬 主动消息
         <button onclick="closeProactive()">✕</button>
       </h3>
-      <p class="api-hint">让 AI 不等你说话，自己主动来一条。三种可各自开关，由外部定时器/打开页面时触发。</p>
+      <p class="api-hint">让 AI 不等你说话，自己主动来一条。三个定时问候 + 空闲提醒，各自开关，由外部定时器/打开页面时触发。</p>
       <div class="settings-group">
         <label>Bark 通知地址（推送到你手机）</label>
         <input type="text" id="barkUrlInput" placeholder="https://api.day.app/你的Key">
-      </div>
-      <div class="settings-group">
-        <label>总开关</label>
-        <select id="proactiveEnabledSelect">
-          <option value="0">关闭</option>
-          <option value="1">开启</option>
-        </select>
       </div>
       <div class="settings-group">
         <label>早安问候</label>
@@ -797,6 +789,17 @@
       <div class="settings-group">
         <label>早安时间</label>
         <input type="time" id="proactiveMorningTimeInput" value="08:00">
+      </div>
+      <div class="settings-group">
+        <label>午安问候</label>
+        <select id="proactiveNoonEnabledSelect">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>午安时间</label>
+        <input type="time" id="proactiveNoonTimeInput" value="12:00">
       </div>
       <div class="settings-group">
         <label>晚安问候</label>
@@ -927,9 +930,7 @@
   const opacitySlider = document.getElementById('opacitySlider');
   const opacityValue = document.getElementById('opacityValue');
   const assistantAvatarInput = document.getElementById('assistantAvatarInput');
-  const userAvatarInput = document.getElementById('userAvatarInput');
   const assistantAvatarPreview = document.getElementById('assistantAvatarPreview');
-  const userAvatarPreview = document.getElementById('userAvatarPreview');
 
   // ---- 工具 ----
   function escapeHtml(s) {
@@ -1043,7 +1044,7 @@
     let lastRole = null;
 
     const list = messages.length === 0
-      ? [{ role: 'assistant', content: '嘿，这是我们的家。\n想聊点什么？', time: '', tokens: '' }]
+      ? [{ role: 'assistant', content: "嘿，这是 Bunny's Home。\n想聊点什么？", time: '', tokens: '' }]
       : messages;
 
     list.forEach((msg) => {
@@ -1155,12 +1156,6 @@
     } else {
       assistantAvatarPreview.style.display = 'none';
     }
-    if (appSettings.userAvatar) {
-      userAvatarPreview.src = appSettings.userAvatar;
-      userAvatarPreview.style.display = 'inline-block';
-    } else {
-      userAvatarPreview.style.display = 'none';
-    }
     settingsPanel.classList.add('show');
 
     // 拉取服务端 system_prompt
@@ -1177,15 +1172,30 @@
     settingsPanel.classList.remove('show');
   }
 
+  async function previewAssistantAvatar(input) {
+    if (!input.files[0]) return;
+    const dataUrl = await cropSquareImage(input.files[0]);
+    assistantAvatarPreview.src = dataUrl;
+    assistantAvatarPreview.style.display = 'inline-block';
+    appSettings.assistantAvatar = dataUrl;
+    renderMessages();
+  }
+  async function previewBackground(input) {
+    if (!input.files[0]) return;
+    const dataUrl = await readAsDataURL(input.files[0]);
+    const bgPreview = document.getElementById('bgPreview');
+    bgPreview.style.backgroundImage = `url(${dataUrl})`;
+    bgPreview.style.display = 'block';
+    appSettings.background = dataUrl;
+    applyAppearance();
+  }
+
   async function saveSettings() {
     appSettings.aiName = aiNameInput.value.trim() || 'AI';
     appSettings.bubbleOpacity = parseFloat(opacitySlider.value);
 
     if (assistantAvatarInput.files[0]) {
       appSettings.assistantAvatar = await cropSquareImage(assistantAvatarInput.files[0]);
-    }
-    if (userAvatarInput.files[0]) {
-      appSettings.userAvatar = await cropSquareImage(userAvatarInput.files[0]);
     }
     if (bgFileInput.files[0]) {
       appSettings.background = await readAsDataURL(bgFileInput.files[0]);
@@ -1327,9 +1337,10 @@
       const resp = await fetch(`${API_BASE}/api/settings`);
       if (resp.ok) {
         const s = (await resp.json()).settings || {};
-        document.getElementById('proactiveEnabledSelect').value = s.proactive_enabled ? '1' : '0';
         document.getElementById('proactiveMorningEnabledSelect').value = s.proactive_morning_enabled ? '1' : '0';
         document.getElementById('proactiveMorningTimeInput').value = s.proactive_morning_time || '08:00';
+        document.getElementById('proactiveNoonEnabledSelect').value = s.proactive_noon_enabled ? '1' : '0';
+        document.getElementById('proactiveNoonTimeInput').value = s.proactive_noon_time || '12:00';
         document.getElementById('proactiveNightEnabledSelect').value = s.proactive_night_enabled ? '1' : '0';
         document.getElementById('proactiveNightTimeInput').value = s.proactive_night_time || '22:00';
         document.getElementById('proactiveIdleEnabledSelect').value = s.proactive_idle_enabled ? '1' : '0';
@@ -1345,9 +1356,10 @@
   async function saveProactive() {
     const idleRaw = document.getElementById('proactiveIdleHoursInput').value.trim();
     const body = {
-      proactive_enabled: document.getElementById('proactiveEnabledSelect').value === '1',
       proactive_morning_enabled: document.getElementById('proactiveMorningEnabledSelect').value === '1',
       proactive_morning_time: document.getElementById('proactiveMorningTimeInput').value,
+      proactive_noon_enabled: document.getElementById('proactiveNoonEnabledSelect').value === '1',
+      proactive_noon_time: document.getElementById('proactiveNoonTimeInput').value,
       proactive_night_enabled: document.getElementById('proactiveNightEnabledSelect').value === '1',
       proactive_night_time: document.getElementById('proactiveNightTimeInput').value,
       proactive_idle_enabled: document.getElementById('proactiveIdleEnabledSelect').value === '1',

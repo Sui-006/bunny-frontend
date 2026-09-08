@@ -15,7 +15,7 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      background: #f0f4fa;
+      background: #f4f7fb;
       height: 100vh;
       display: flex;
       align-items: center;
@@ -37,13 +37,13 @@
       width: 280px;
       height: 100%;
       background: #f7fafe;
-      border-right: 1px solid #d0e0ec;
+      border-right: 1px solid #e2ecf4;
       padding: 20px 12px;
       display: flex;
       flex-direction: column;
       transition: left 0.3s ease;
       z-index: 1000;
-      box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+      box-shadow: 2px 0 16px rgba(0,0,0,0.05);
     }
     .sidebar.open { left: 0; }
     .sidebar-overlay {
@@ -76,8 +76,8 @@
     }
     .new-chat {
       background: #ffffff;
-      border: 1px solid #d0e0ec;
-      border-radius: 12px;
+      border: 1px solid #e2ecf4;
+      border-radius: 14px;
       padding: 10px 14px;
       font-size: 14px;
       color: var(--accent);
@@ -96,7 +96,7 @@
     }
     .chat-item {
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
       color: #5a6a7a;
       cursor: pointer;
@@ -115,7 +115,7 @@
       padding: 10px;
       background: #e4edf7;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       color: var(--accent-strong);
       font-size: 14px;
       cursor: pointer;
@@ -168,8 +168,8 @@
     }
     .model-select {
       padding: 4px 8px;
-      border: 1px solid #d0e0ec;
-      border-radius: 8px;
+      border: 1px solid #e2ecf4;
+      border-radius: 10px;
       background: rgba(255,255,255,0.8);
       font-size: 12px;
       color: #5a6a7a;
@@ -254,20 +254,20 @@
     }
     .message-bubble {
       padding: 10px 14px;
-      border-radius: 14px;
+      border-radius: 18px;
       font-size: 14px;
       line-height: 1.6;
       word-break: break-word;
-      background: rgba(255,255,255,0.9);
-      border: 1px solid rgba(208,224,236,0.4);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(210,226,240,0.5);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
       transition: opacity 0.3s;
     }
     .message-wrapper.self .message-bubble {
-      border-bottom-right-radius: 4px;
+      border-bottom-right-radius: 6px;
     }
     .message-wrapper.other .message-bubble {
-      border-bottom-left-radius: 4px;
+      border-bottom-left-radius: 6px;
     }
     .attachment-preview {
       display: flex;
@@ -283,7 +283,7 @@
       align-items: center;
       gap: 6px;
       background: rgba(232,239,245,0.6);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 4px 10px 4px 8px;
       font-size: 13px;
       color: var(--accent-strong);
@@ -334,8 +334,8 @@
     .input-box {
       flex: 1;
       resize: none;
-      border: 1px solid rgba(208,224,236,0.6);
-      border-radius: 20px;
+      border: 1px solid rgba(210,226,240,0.6);
+      border-radius: 22px;
       padding: 10px 16px;
       font-size: 14px;
       font-family: inherit;
@@ -352,7 +352,7 @@
     .send-btn {
       background: var(--accent-soft);
       border: none;
-      border-radius: 20px;
+      border-radius: 22px;
       padding: 10px 18px;
       font-size: 14px;
       color: #ffffff;
@@ -386,13 +386,13 @@
     .settings-panel.show { display: flex; }
     .settings-card {
       background: #ffffff;
-      border-radius: 20px;
+      border-radius: 24px;
       padding: 24px 20px;
       width: 90%;
       max-width: 400px;
       max-height: 80vh;
       overflow-y: auto;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.12);
     }
     .settings-card h3 {
       color: var(--accent-strong);
@@ -422,8 +422,8 @@
     .settings-group textarea {
       width: 100%;
       padding: 8px 12px;
-      border: 1px solid #d0e0ec;
-      border-radius: 10px;
+      border: 1px solid #e2ecf4;
+      border-radius: 12px;
       font-size: 14px;
       background: #fcfaff;
       color: #4a5a6a;
@@ -464,8 +464,8 @@
     .settings-group .file-input-wrap .file-label {
       display: block;
       padding: 8px 12px;
-      border: 1px dashed #b0c4de;
-      border-radius: 10px;
+      border: 1px dashed #bccfe0;
+      border-radius: 12px;
       text-align: center;
       color: var(--accent);
       background: #f4f8fc;
@@ -476,7 +476,7 @@
       padding: 10px;
       background: var(--accent-soft);
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       color: white;
       font-size: 16px;
       font-weight: 500;
@@ -500,7 +500,7 @@
       align-items: center;
       gap: 4px;
       padding: 14px 16px;
-      border-bottom: 1px solid #d0e0ec;
+      border-bottom: 1px solid #e2ecf4;
       flex-shrink: 0;
     }
     .profile-header .back-btn {
@@ -594,7 +594,7 @@
 <body>
 <div class="splash" id="splash">
   <div class="splash-title">WELCOME</div>
-  <div class="splash-sub">我们的家</div>
+  <div class="splash-sub">Bunny's Home</div>
 </div>
 <div class="app">
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
@@ -775,17 +775,10 @@
         💬 主动消息
         <button onclick="closeProactive()">✕</button>
       </h3>
-      <p class="api-hint">让 AI 不等你说话，自己主动来一条：定时问候（每天早上问候）＋ 空闲提醒（你很久没聊时关心你）。由外部定时器/打开页面时触发。</p>
+      <p class="api-hint">让 AI 不等你说话，自己主动来一条。三种可各自开关，由外部定时器/打开页面时触发。</p>
       <div class="settings-group">
-        <label>Bark 通知地址（AI 主动发消息时推送到你手机）</label>
+        <label>Bark 通知地址（推送到你手机）</label>
         <input type="text" id="barkUrlInput" placeholder="https://api.day.app/你的Key">
-      </div>
-      <div class="settings-group">
-        <label>普通回复也通知（你不在该页面时）</label>
-        <select id="replyNotifyEnabledSelect">
-          <option value="1">开启</option>
-          <option value="0">关闭</option>
-        </select>
       </div>
       <div class="settings-group">
         <label>总开关</label>
@@ -795,23 +788,44 @@
         </select>
       </div>
       <div class="settings-group">
-        <label>定时问候</label>
-        <select id="proactiveGreetingEnabledSelect">
+        <label>早安问候</label>
+        <select id="proactiveMorningEnabledSelect">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>早安时间</label>
+        <input type="time" id="proactiveMorningTimeInput" value="08:00">
+      </div>
+      <div class="settings-group">
+        <label>晚安问候</label>
+        <select id="proactiveNightEnabledSelect">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>晚安时间</label>
+        <input type="time" id="proactiveNightTimeInput" value="22:00">
+      </div>
+      <div class="settings-group">
+        <label>空闲提醒</label>
+        <select id="proactiveIdleEnabledSelect">
           <option value="0">关闭</option>
           <option value="1">开启</option>
         </select>
       </div>
       <div class="settings-group">
-        <label>问候时间（每天）</label>
-        <input type="time" id="proactiveGreetingTimeInput" value="08:00">
-      </div>
-      <div class="settings-group">
-        <label>自定义问候语（可选，留空用默认）</label>
-        <textarea id="proactiveGreetingPromptInput" placeholder="例如：每天早上主动跟我说早安，语气温柔一点"></textarea>
-      </div>
-      <div class="settings-group">
-        <label>空闲提醒：几小时没消息触发（留空 = 关闭）</label>
+        <label>空闲几小时没消息触发</label>
         <input type="number" id="proactiveIdleHoursInput" min="1" max="720" placeholder="例如：6">
+      </div>
+      <div class="settings-group">
+        <label>普通回复也通知（你不在页面时）</label>
+        <select id="replyNotifyEnabledSelect">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
       </div>
       <button class="settings-save" onclick="saveProactive()">保存设置</button>
     </div>
@@ -1314,9 +1328,11 @@
       if (resp.ok) {
         const s = (await resp.json()).settings || {};
         document.getElementById('proactiveEnabledSelect').value = s.proactive_enabled ? '1' : '0';
-        document.getElementById('proactiveGreetingEnabledSelect').value = s.proactive_greeting_enabled ? '1' : '0';
-        document.getElementById('proactiveGreetingTimeInput').value = s.proactive_greeting_time || '08:00';
-        document.getElementById('proactiveGreetingPromptInput').value = s.proactive_greeting_prompt || '';
+        document.getElementById('proactiveMorningEnabledSelect').value = s.proactive_morning_enabled ? '1' : '0';
+        document.getElementById('proactiveMorningTimeInput').value = s.proactive_morning_time || '08:00';
+        document.getElementById('proactiveNightEnabledSelect').value = s.proactive_night_enabled ? '1' : '0';
+        document.getElementById('proactiveNightTimeInput').value = s.proactive_night_time || '22:00';
+        document.getElementById('proactiveIdleEnabledSelect').value = s.proactive_idle_enabled ? '1' : '0';
         document.getElementById('proactiveIdleHoursInput').value = (s.proactive_idle_hours == null ? '' : s.proactive_idle_hours);
         document.getElementById('barkUrlInput').value = s.bark_url || '';
         document.getElementById('replyNotifyEnabledSelect').value = s.reply_notify_enabled ? '1' : '0';
@@ -1330,9 +1346,11 @@
     const idleRaw = document.getElementById('proactiveIdleHoursInput').value.trim();
     const body = {
       proactive_enabled: document.getElementById('proactiveEnabledSelect').value === '1',
-      proactive_greeting_enabled: document.getElementById('proactiveGreetingEnabledSelect').value === '1',
-      proactive_greeting_time: document.getElementById('proactiveGreetingTimeInput').value,
-      proactive_greeting_prompt: document.getElementById('proactiveGreetingPromptInput').value.trim(),
+      proactive_morning_enabled: document.getElementById('proactiveMorningEnabledSelect').value === '1',
+      proactive_morning_time: document.getElementById('proactiveMorningTimeInput').value,
+      proactive_night_enabled: document.getElementById('proactiveNightEnabledSelect').value === '1',
+      proactive_night_time: document.getElementById('proactiveNightTimeInput').value,
+      proactive_idle_enabled: document.getElementById('proactiveIdleEnabledSelect').value === '1',
       proactive_idle_hours: idleRaw === '' ? null : Number(idleRaw),
       bark_url: document.getElementById('barkUrlInput').value.trim(),
       reply_notify_enabled: document.getElementById('replyNotifyEnabledSelect').value === '1',

@@ -80,7 +80,7 @@
       font-family: 'BAUHS93', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       background: var(--bg);
       color: var(--text);
-      height: 100vh;
+      height: 100vh; height: 100dvh;
       overflow: hidden;
       transition: background 0.3s, color 0.3s;
     }
@@ -89,7 +89,7 @@
     ::-webkit-scrollbar-thumb { background: rgba(140,160,180,0.35); border-radius: 8px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(140,160,180,0.55); }
 
-    .app { display: block; height: 100vh; width: 100%; }
+    .app { display: block; height: 100vh; height: 100dvh; width: 100%; }
     .scrim { position: fixed; inset: 0; background: rgba(15,23,35,0.4); z-index: 110; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(2px); }
     .scrim.show { opacity: 1; pointer-events: auto; }
 
@@ -160,6 +160,8 @@
       background-size: cover; background-position: center; cursor: pointer; flex-shrink: 0;
     }
     .view { flex: 1; overflow-y: auto; position: relative; z-index: 1; padding: 22px 24px calc(100px + env(safe-area-inset-bottom)); }
+    /* AI Chat：整个页面就是聊天，无外边距、无内边距、铺满动态视口 */
+    .view.view-chat { padding: 0; overflow: hidden; }
     .view-inner { max-width: 1080px; margin: 0 auto; animation: viewIn 0.22s ease; }
     @keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -289,6 +291,7 @@
     .menu button:hover { background: var(--accent-tint); }
     .menu button.danger { color: #c0392b; }
     .menu button.danger:hover { background: #fbeaea; }
+    .menu-header { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted, #94a3b8); padding: 8px 12px 4px; }
 
     /* color swatches */
     .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -338,7 +341,7 @@
     .conv-item .c-last { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .conv-item .c-time { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
     .unread { min-width: 18px; height: 18px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
-    .bubble { max-width: 85%; padding: 11px 15px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-break: break-word; }
+    .bubble { max-width: 80%; padding: 11px 15px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-break: break-word; }
     .bubble.in { background: var(--card-solid); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
     .bubble.out { background: var(--accent); color: #fff; border-bottom-right-radius: 6px; align-self: flex-end; }
     .chat-input-bar { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
@@ -833,7 +836,9 @@ function confirmDialog(title, msg, onYes, dangerLabel) {
 }
 function menu(items, x, y) {
   const root = document.getElementById('menuRoot');
-  root.innerHTML = '<div class="menu">' + items.map((it) => '<button class="' + (it.danger ? 'danger' : '') + '" onclick="' + it.fn + '">' + (it.ico || '') + '<span>' + esc(it.label) + '</span></button>').join('') + '</div>';
+  root.innerHTML = '<div class="menu">' + items.map((it) => it.header
+    ? '<div class="menu-header">' + esc(it.label) + '</div>'
+    : '<button class="' + (it.danger ? 'danger' : '') + '" onclick="' + it.fn + '">' + (it.ico || '') + '<span>' + esc(it.label) + '</span></button>').join('') + '</div>';
   const el = root.firstChild;
   const r = el.getBoundingClientRect();
   el.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px';
@@ -842,26 +847,28 @@ function menu(items, x, y) {
 }
 function closeMenu() { document.getElementById('menuRoot').innerHTML = ''; }
 
-/* ---- iOS 左边缘右滑打开 Sidebar（需求 9/11）：阻止浏览器返回、不产生历史记录 ---- */
+/* ---- iOS 左边缘横滑：右滑切换 Sidebar（关→开，开→关），左滑关闭；阻止浏览器返回、不产生历史记录 ---- */
 let _edgeStart = null;
 function bindEdgeSwipe() {
   const EDGE = 26, TRIGGER = 56;
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { _edgeStart = null; return; }
-    const t = e.touches[0]; const sb = document.getElementById('sidebar');
-    _edgeStart = (t.clientX <= EDGE && sb && !sb.classList.contains('open')) ? { x: t.clientX, y: t.clientY } : null;
+    const t = e.touches[0];
+    _edgeStart = (t.clientX <= EDGE) ? { x: t.clientX, y: t.clientY } : null;
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (!_edgeStart) return;
     const t = e.touches[0]; const dx = t.clientX - _edgeStart.x, dy = t.clientY - _edgeStart.y;
-    // 明确是「左边缘向右横滑」时阻止原生返回手势
-    if (dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.4 && e.cancelable) e.preventDefault();
+    // 明确是「左边缘横向滑」时阻止原生返回手势（无论方向），保证侧栏手势优先于浏览器返回
+    if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.4 && e.cancelable) e.preventDefault();
   }, { passive: false });
   document.addEventListener('touchend', (e) => {
     if (!_edgeStart) return;
     const t = e.changedTouches[0]; const dx = t.clientX - _edgeStart.x, dy = t.clientY - _edgeStart.y;
     _edgeStart = null;
-    if (dx > TRIGGER && Math.abs(dx) > Math.abs(dy) * 1.4) OS.toggleSidebar(true);
+    if (Math.abs(dx) <= Math.abs(dy) * 1.4) return;
+    if (dx > TRIGGER) OS.toggleSidebar();        // 右滑：关→开，开→关（右滑返回关闭 Sidebar）
+    else if (dx < -TRIGGER) OS.toggleSidebar(false); // 左滑：关闭
   });
 }
 
@@ -869,7 +876,7 @@ function bindEdgeSwipe() {
 const ROUTES = {
   '/today': 'Home', '/tasks': '任务', '/calendar': '日历', '/alarm': '闹钟', '/plans': '计划',
   '/plans/long-term': '长期计划', '/plans/stage': '阶段计划', '/plans/monthly': '月度计划', '/plans/weekly': '周计划',
-  '/habit': '习惯', '/health': '健康', '/medical': '个人病历', '/statistics': '统计', '/finance': '记账', '/period': '经期',
+  '/habit': '习惯', '/health': '健康', '/health/medical-records': 'Medical Records', '/statistics': '统计', '/finance': '记账', '/period': '经期',
   '/chat': '我的AI · 对话', '/player': '音乐',
   '/shopping': '购物清单', '/ai/memory': 'AI 记忆', '/ai/activity': 'AI 动态', '/journal': '我的日志',
   '/notes': '笔记', '/notifications': '通知', '/profile': '我的主页', '/search': '搜索',
@@ -912,11 +919,12 @@ const OS = {
 /* ---------------- shell: sidebar / topbar / bottomnav ---------------- */
 function navGroups() {
   const n = (route, ico, label, badge) => ({ route, ico, label, badge });
+  const PLAN_EN = { 'weekly': 'Weekly Plan', 'monthly': 'Monthly Plan', 'stage': 'Stage Plan', 'long-term': 'Long-term Plan' };
   return [
-    { title: 'TODAY', items: [ n('/today', '🏠', 'Home'), n('/tasks', '✅', 'Task'), n('/calendar', '📅', 'Calendar'), n('/alarm', '⏰', '闹钟') ] },
+    { title: 'TODAY', items: [ n('/today', '🏠', 'Home'), n('/tasks', '✅', 'Tasks'), n('/calendar', '📅', 'Calendar'), n('/alarm', '⏰', 'Alarms') ] },
     { title: '♥ 我的AI', ai: true, items: [ n('/chat', '💬', 'AI Chat'), n('/ai/memory', '🧠', 'AI Memory'), n('/ai/activity', '💗', 'AI Activity') ] },
-    { title: 'PLANS', items: PLAN_ORDER.map((t) => n('/plans/' + t, TYPE_META[t].ico, TYPE_META[t].label)) },
-    { title: 'LIFE', items: [ n('/habit', '🌱', 'Habit'), n('/health', '❤️', 'Health'), n('/medical', '🩺', '病历'), n('/statistics', '📊', 'Statistics'), n('/shopping', '🛒', 'Shopping'), n('/finance', '💰', '记账'), n('/player', '🎵', 'Music') ] },
+    { title: 'PLANS', items: PLAN_ORDER.map((t) => n('/plans/' + t, TYPE_META[t].ico, PLAN_EN[t])) },
+    { title: 'LIFE', items: [ n('/habit', '🌱', 'Habits'), n('/health', '❤️', 'Health'), n('/statistics', '📊', 'Statistics'), n('/shopping', '🛒', 'Shopping'), n('/finance', '💰', 'Finance'), n('/player', '🎵', 'Music') ] },
   ];
 }
 function renderSidebar() {
@@ -927,7 +935,7 @@ function renderSidebar() {
   html += '<div class="nav-scroll">';
   for (const g of navGroups()) {
     if (g.ai) {
-      html += '<div class="ai-nav-group"><div class="ai-nav-title">♥ 我的AI<span class="muted" style="font-weight:400;letter-spacing:0"> · 智能中枢</span></div>';
+      html += '<div class="ai-nav-group"><div class="ai-nav-title">♥ 我的AI<span class="muted" style="font-weight:400;letter-spacing:0"> · AI Hub</span></div>';
       for (const it of g.items) {
         const active = OS.route === it.route ? ' active' : '';
         html += '<button class="nav-item' + active + '" onclick="OS.toggleSidebar(false);OS.go(\'' + it.route + '\')"><span class="ico">' + it.ico + '</span><span class="lbl">' + esc(it.label) + '</span></button>';
@@ -995,7 +1003,12 @@ let _lastRoute = OS.route;
 function render() {
   renderSidebar(); renderTopbar();
   const view = document.getElementById('view');
+  const topbar = document.getElementById('topbar');
   const r = OS.route;
+  const isChat = r === '/chat';
+  // AI Chat 独占整屏：隐藏全局顶栏、view 去掉内边距，聊天自己的头部承担顶栏
+  if (topbar) topbar.style.display = isChat ? 'none' : 'flex';
+  view.classList.toggle('view-chat', isChat);
   const routeChanged = _lastRoute !== r;
   if (routeChanged) { viewScrollPos[_lastRoute] = view.scrollTop; _lastRoute = r; }
   let html;
@@ -1011,7 +1024,7 @@ function render() {
     else if (r.startsWith('/plans/')) html += viewPlanType(r.split('/')[2]);
     else if (r === '/habit') html += viewHabit();
     else if (r === '/health') html += viewHealth();
-    else if (r === '/medical') html += viewMedical();
+    else if (r === '/health/medical-records') html += viewMedical();
     else if (r === '/finance') html += viewFinance();
     else if (r === '/period') html += viewPeriod();
     else if (r === '/statistics') html += viewStatistics();
@@ -1838,21 +1851,23 @@ const MEDICAL_TYPES = ['过敏史', '疾病', '就诊', '检查', '手术', '用
 // 健康页上的「个人病历」入口卡片（需求 13）：置于折线图上方，点击进入独立病历页
 function medicalRecordsSection() {
   const count = (DB.medicalRecords || []).length;
-  return '<div class="card card-pad" style="cursor:pointer;margin-bottom:16px;display:flex;align-items:center;gap:12px" onclick="OS.go(\'/medical\')">' +
+  return '<div class="card card-pad" style="cursor:pointer;margin-bottom:16px;display:flex;align-items:center;gap:12px" onclick="OS.go(\'/health/medical-records\')">' +
     '<span style="font-size:26px">🏥</span>' +
-    '<div class="grow"><div style="font-weight:700;font-size:15px">个人病历</div><div class="muted" style="font-size:12px">' + (count ? count + ' 条记录 · ' : '') + '点击查看和记录 →</div></div>' +
+    '<div class="grow"><div style="font-weight:700;font-size:15px">Medical Records</div><div class="muted" style="font-size:12px">' + (count ? count + ' records · ' : '') + 'View & record →</div></div>' +
     '<span class="muted" style="font-size:20px">›</span></div>';
 }
 // 独立「个人病历」页（需求 13）：病历 / 疾病 / 既往史 / 手术 / 过敏 / 药物 / 医疗备注 / 就诊记录
 function viewMedical() {
   const recs = DB.medicalRecords.slice().sort((a, b) => (b.date || '') < (a.date || '') ? -1 : 1);
-  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">个人病历</div><div class="muted">隐私信息，仅自己可见</div></div><button class="btn btn-primary" onclick="medicalRecordModal()">＋ 添加</button></div>';
+  let html = '<div class="spread" style="margin-bottom:16px"><div><button class="back-link" style="background:none;border:none;color:var(--accent-strong);font-size:13px;padding:0;cursor:pointer" onclick="OS.go(\'/health\')">‹ Health</button><div class="h1" style="margin-top:6px">Medical Records</div><div class="muted">Private · only you can see</div></div><button class="btn btn-primary" onclick="medicalRecordModal()">＋ Add Record</button></div>';
   html += '<div class="muted" style="font-size:12px;margin:0 0 12px">记录病历 / 疾病 / 既往史 / 手术 / 过敏 / 药物 / 医疗备注 / 就诊记录；AI 只提供建议，不会自动写入。</div>';
   if (recs.length === 0) {
     html += '<div class="card card-pad empty" style="padding:30px"><div style="font-size:36px;margin-bottom:8px">🩺</div><div class="esub">暂无病历记录</div><div class="muted" style="font-size:12px;margin-top:6px">点击右上角「＋ 添加」记录第一条</div></div>';
   } else {
     html += '<div class="card card-pad" style="padding:6px 8px">' + recs.map((r) => {
       const fields = [];
+      if (r.hospital) fields.push('🏥 ' + r.hospital);
+      if (r.doctor) fields.push('👨‍⚕️ ' + r.doctor);
       if (r.diagnosis) fields.push('诊断：' + r.diagnosis);
       if (r.symptoms) fields.push('症状：' + r.symptoms);
       if (r.medication) fields.push('用药：' + r.medication);
@@ -1867,6 +1882,7 @@ function medicalRecordModal(id) {
   modal('<div class="modal-head"><h3>' + (r ? '编辑病历' : '添加病历') + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
     '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>类型</label><select class="select" id="mrType">' + typeOpts + '</select></div><div class="grow"><label>日期</label><input class="input" type="date" id="mrDate" value="' + (r ? (r.date || '') : todayStr()) + '"></div></div></div>' +
     '<div class="field"><label>标题</label><input class="input" id="mrTitle" value="' + esc(r ? r.title : '') + '" placeholder="如：感冒 / 青霉素过敏"></div>' +
+    '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>医院 / 诊所</label><input class="input" id="mrHospital" value="' + esc(r ? (r.hospital || '') : '') + '"></div><div class="grow"><label>医生</label><input class="input" id="mrDoctor" value="' + esc(r ? (r.doctor || '') : '') + '"></div></div></div>' +
     '<div class="field"><label>诊断（医生确诊）</label><input class="input" id="mrDiag" value="' + esc(r ? (r.diagnosis || '') : '') + '"></div>' +
     '<div class="field"><label>症状</label><input class="input" id="mrSym" value="' + esc(r ? (r.symptoms || '') : '') + '"></div>' +
     '<div class="field"><label>用药</label><input class="input" id="mrMed" value="' + esc(r ? (r.medication || '') : '') + '"></div>' +
@@ -1876,7 +1892,7 @@ function medicalRecordModal(id) {
 function saveMedicalRecord(id) {
   const title = document.getElementById('mrTitle').value.trim();
   if (!title) { toast('请输入标题', true); return; }
-  const data = { title, type: document.getElementById('mrType').value, date: document.getElementById('mrDate').value || todayStr(), diagnosis: document.getElementById('mrDiag').value.trim(), symptoms: document.getElementById('mrSym').value.trim(), medication: document.getElementById('mrMed').value.trim(), notes: document.getElementById('mrNotes').value.trim(), source: 'user' };
+  const data = { title, type: document.getElementById('mrType').value, date: document.getElementById('mrDate').value || todayStr(), hospital: document.getElementById('mrHospital').value.trim(), doctor: document.getElementById('mrDoctor').value.trim(), diagnosis: document.getElementById('mrDiag').value.trim(), symptoms: document.getElementById('mrSym').value.trim(), medication: document.getElementById('mrMed').value.trim(), notes: document.getElementById('mrNotes').value.trim(), source: 'user' };
   if (id) { const r = DB.medicalRecords.find((x) => x.id === id); Object.assign(r, data, { updatedAt: Date.now() }); }
   else DB.medicalRecords.push({ id: uid(), createdAt: Date.now(), updatedAt: Date.now(), ...data });
   saveDB(); closeModal(); render(); toast('已保存 ✓');
@@ -2579,9 +2595,66 @@ function removeWallpaper() { DB.appearance.wallpaper = ''; saveDB(); applyTheme(
 
 /* ================= SETTINGS / AI ================= */
 function aiSet() { if (!DB.aiSettings) DB.aiSettings = { aiName: 'Bunny', assistantAvatar: '', assistantAvatarUrl: '', bubbleOpacity: 0.9, model: 'deepseek-chat', systemPrompt: '', streaming: true, memory: true, autoCompress: true, chatBackground: null }; return DB.aiSettings; }
+// ---- AI 助手（与「模型」解耦）：DB.assistants 持久化到后端 /api/state；aiSettings 里存「当前激活」配置 ----
+function defaultAssistant(id, name, model) { return { id, name, avatar: '', avatarUrl: '', personality: '温柔、体贴、简洁的 AI 伴侣', systemPrompt: '', model: model || 'deepseek-chat', createdAt: Date.now() }; }
+function ensureAssistants() {
+  if (!Array.isArray(DB.assistants)) DB.assistants = [];
+  if (DB.assistants.length === 0) {
+    // 首次迁移：用现有的 aiSettings 播种默认 Bunny，保留用户已有的名字/头像/模型/人格
+    const s = aiSet();
+    const a = defaultAssistant('bunny', s.aiName || 'Bunny', s.model || 'deepseek-chat');
+    a.avatar = s.assistantAvatar || ''; a.avatarUrl = s.assistantAvatarUrl || ''; a.systemPrompt = s.systemPrompt || '';
+    DB.assistants.push(a);
+  }
+  if (!DB.activeAssistantId || !DB.assistants.some((a) => a.id === DB.activeAssistantId)) DB.activeAssistantId = DB.assistants[0].id;
+  return DB.assistants;
+}
+// 把某个助手的配置应用到「当前激活」aiSettings，并记录 activeAssistantId
+function applyAssistant(a) {
+  const s = aiSet();
+  if (a.name) s.aiName = a.name;
+  if (a.model) s.model = a.model;
+  s.systemPrompt = a.systemPrompt || '';
+  s.assistantAvatar = a.avatar || '';
+  s.assistantAvatarUrl = a.avatarUrl || '';
+  DB.activeAssistantId = a.id;
+}
+// 把「当前激活」配置写回助手列表（保存设置时同步，避免切换后丢失编辑）
+function syncActiveAssistantBack() {
+  const s = aiSet();
+  const list = ensureAssistants();
+  const a = list.find((x) => x.id === DB.activeAssistantId);
+  if (a) { a.name = s.aiName; a.model = s.model; a.systemPrompt = s.systemPrompt || ''; a.avatar = s.assistantAvatar || ''; a.avatarUrl = s.assistantAvatarUrl || ''; }
+}
+function addAssistantModal() {
+  modal('<div class="modal-head"><h3>新增 AI 助手</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
+    '<div class="field"><label>名字</label><input class="input" id="asName" placeholder="如：Bunny"></div>' +
+    '<div class="field"><label>默认模型</label><select class="select" id="asModel">' + MODELS.map(([v, l]) => '<option value="' + v + '"' + (v === 'deepseek-chat' ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label>人格描述</label><textarea class="textarea" id="asPersonality" placeholder="温柔、体贴、简洁…"></textarea></div>' +
+    '</div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="createAssistant()">创建并切换</button></div>');
+}
+function createAssistant() {
+  const name = (document.getElementById('asName').value || '').trim() || '新助手';
+  const model = document.getElementById('asModel').value || 'deepseek-chat';
+  const personality = (document.getElementById('asPersonality').value || '').trim();
+  const a = defaultAssistant(uid(), name, model);
+  if (personality) a.personality = personality;
+  DB.assistants.push(a);
+  applyAssistant(a);
+  closeModal(); saveDB(); render(); toast('已创建并切换到 ' + name);
+}
 function viewSettingsAI() {
   const s = aiSet();
-  let html = '<div class="h1" style="margin-bottom:16px">我的AI 设置</div><div class="card card-pad">' +
+  const list = ensureAssistants();
+  const assistRows = list.map((a) => '<div class="row" style="gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">' +
+    '<div class="avatar" style="width:32px;height:32px;flex-shrink:0;' + (a.avatar ? 'background-image:url(' + a.avatar + ')' : '') + '">' + (a.avatar ? '' : '♥') + '</div>' +
+    '<div class="grow" style="min-width:0"><div style="font-weight:600;font-size:14px">' + esc(a.name || '未命名') + (a.id === DB.activeAssistantId ? ' <span class="muted" style="font-size:11px">(当前)</span>' : '') + '</div><div class="muted" style="font-size:11px">' + esc(a.model || '') + '</div></div>' +
+    '<button class="btn btn-sm btn-soft" onclick="OS.chat.switchAssistant(\'' + a.id + '\')">' + (a.id === DB.activeAssistantId ? '使用中' : '切换') + '</button>' +
+    '</div>').join('');
+  let html = '<div class="h1" style="margin-bottom:16px">我的AI 设置</div>' +
+    '<div class="card card-pad" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center"><label style="margin:0;font-weight:700">AI 助手</label><button class="btn btn-sm" onclick="addAssistantModal()">＋ 新增</button></div>' +
+    '<div class="muted" style="font-size:11px;margin:2px 0 8px">助手和模型是两个概念：助手绑定人格/头像/默认模型；切换助手会整体切换身份。</div>' + (assistRows || '<div class="muted">暂无助手</div>') + '</div>' +
+    '<div class="card card-pad">' +
     '<div class="field"><label>AI 名字</label><input class="input" id="aiName" value="' + esc(s.aiName) + '"></div>' +
     '<div class="field"><label>系统提示词（AI 人格）</label><textarea class="textarea" id="aiPrompt">' + esc(s.systemPrompt) + '</textarea></div>' +
     '<div class="field"><label>默认模型</label><select class="select" id="aiModel"><optgroup label="DeepSeek"><option value="deepseek-chat"' + (s.model === 'deepseek-chat' ? ' selected' : '') + '>DeepSeek Chat</option><option value="deepseek-reasoner"' + (s.model === 'deepseek-reasoner' ? ' selected' : '') + '>DeepSeek Reasoner</option></optgroup><optgroup label="OpenAI"><option value="gpt-4o"' + (s.model === 'gpt-4o' ? ' selected' : '') + '>GPT-4o</option><option value="gpt-4o-mini"' + (s.model === 'gpt-4o-mini' ? ' selected' : '') + '>GPT-4o mini</option></optgroup><optgroup label="Claude"><option value="claude-sonnet-5"' + (s.model === 'claude-sonnet-5' ? ' selected' : '') + '>Claude Sonnet 5</option><option value="claude-opus-5"' + (s.model === 'claude-opus-5' ? ' selected' : '') + '>Claude Opus 5</option></optgroup></select></div>' +
@@ -2609,6 +2682,7 @@ function toggles() {
 }
 function toggleAiFlag(k) { const s = aiSet(); s[k] = !s[k]; saveDB(); render(); }
 async function saveAISettings() {
+  ensureAssistants();
   const s = aiSet();
   s.aiName = document.getElementById('aiName').value.trim() || 'Bunny';
   s.systemPrompt = document.getElementById('aiPrompt').value;
@@ -2617,11 +2691,19 @@ async function saveAISettings() {
   const av = document.getElementById('aiAvatarFile');
   if (av.files[0]) {
     const jpeg = await cropSquareImage(av.files[0], 'image/jpeg', 0.9);
-    s.assistantAvatar = jpeg;                 // UI 显示用（data URL，离线也可见）
     const pub = await uploadAssistantAvatar(jpeg);
-    if (pub) s.assistantAvatarUrl = pub;      // Bark 图标用（公网 JPG URL）
+    if (pub) {
+      // 优先存公网短 URL（可靠持久化 + Bark icon 用），避免超大 data URL 导致 localStorage/后端写穿失败
+      s.assistantAvatarUrl = pub;
+      s.assistantAvatar = pub;
+    } else {
+      // 上传失败（后端不可达/本地）：回退 data URL 仅本地离线显示
+      s.assistantAvatar = jpeg;
+    }
   }
+  syncActiveAssistantBack();                  // 助手列表同步当前激活配置，切换助手不丢编辑
   saveDB(); render(); toast('已保存 ✓');
+  try { await SYNC.push(); } catch (e) {}     // 头像立即写穿后端，刷新后不丢失
   if (OS.chat.currentId) OS.chat.saveSessionSettings();
 }
 function previewAiAvatar(input) {
@@ -2824,14 +2906,16 @@ function viewChat() {
     '<button class="btn btn-sm btn-primary" style="width:100%;margin-bottom:10px" onclick="OS.chat.newChat()">＋ 新对话</button>' +
     '<div class="session-list" id="chatSessions"></div>' +
     '</div>' +
-    '<div class="chat-stage" style="height:calc(100vh - var(--topbar-h) - 40px);border-radius:18px;border:1px solid var(--border);overflow:hidden">' +
+    '<div class="chat-stage" style="height:100dvh;overflow:hidden">' +
     (bgStyle ? '<div class="chat-bg" style="' + bgStyle + '"></div>' : '') +
     '<div class="chat-bg-overlay"></div>' +
-    // 顶部：[☰] [头像] 标题 [⋯]（需求 6：只保留这三个元素，模型选择并入 ⋯ 菜单）
-    '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">' +
+    // 顶部：[☰] [头像] 标题 [⋯]（需求 6：只保留这三个元素，模型选择并入 ⋯ 菜单；safe-area 顶部不被刘海遮挡）
+    '<div style="display:flex;align-items:center;gap:8px;padding:max(8px, env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid var(--border)">' +
     '<button class="icon-btn" onclick="OS.chat.toggleSidebar()" title="会话列表">☰</button>' +
-    '<div class="avatar" style="width:30px;height:30px;font-size:14px;flex-shrink:0;' + (s.assistantAvatar ? 'background-image:url(' + s.assistantAvatar + ')' : '') + '" onclick="OS.go(\'/settings/ai\')">' + (s.assistantAvatar ? '' : '♥') + '</div>' +
-    '<div class="grow" style="min-width:0"><div id="chatTitle" style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title) + '</div><div class="muted" style="font-size:11px">' + esc(s.aiName || '♥ 我的AI') + '</div></div>' +
+    '<div class="avatar" style="width:30px;height:30px;font-size:14px;flex-shrink:0;' + (s.assistantAvatar ? 'background-image:url(' + s.assistantAvatar + ')' : '') + '" onclick="OS.chat.assistantMenu(event)">' + (s.assistantAvatar ? '' : '♥') + '</div>' +
+    '<div class="grow" style="min-width:0;cursor:pointer" onclick="OS.chat.assistantMenu(event)" title="切换 AI 助手">' +
+    '<div id="chatTitle" style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title) + '</div>' +
+    '<div class="muted" style="font-size:11px">' + esc(s.aiName || '♥ 我的AI') + ' <span style="opacity:.6">▾</span></div></div>' +
     '<button class="icon-btn" onclick="OS.chat.topMenu(event)" title="模型 / 会话操作">⋯</button>' +
     '</div>' +
     // 消息区（单列，去掉会挤压气泡的侧栏）
@@ -2867,7 +2951,7 @@ function chatBubbleHtml(msg, isLast) {
   const clickable = msg.id && msg.content && !msg.thinking && !msg.error && !msg.pendingUser;
   return '<div class="chat-msg-row" style="display:flex;' + (isUser ? 'flex-direction:row-reverse' : '') + ';gap:8px;align-items:flex-start">' +
     '<div class="avatar" style="width:30px;height:30px;flex-shrink:0;' + (avatar ? 'background-image:url(' + avatar + ')' : '') + '">' + (avatar ? '' : (isUser ? '🙂' : '♥')) + '</div>' +
-    '<div style="max-width:85%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
+    '<div style="max-width:80%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
     quote +
     '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="opacity:' + (s.bubbleOpacity || 0.9) + ';cursor:' + (clickable ? 'pointer' : 'default') + '"' + (clickable ? ' onclick="OS.chat.bubbleMenu(event,\'' + msg.id + '\')"' : '') + '>' + bubble + '</div></div></div>';
 }
@@ -2940,7 +3024,21 @@ OS.chat.loadSessionSettings = async function() { try { const r = await fetch(API
 OS.chat.saveSessionSettings = async function() { if (!OS.chat.currentId) return; const s = aiSet(); try { await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system_prompt: s.systemPrompt, stream: s.streaming, use_memory: s.memory, auto_compress: s.autoCompress }) }); } catch (e) {} };
 OS.chat.newChat = async function() { try { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions.unshift(c); OS.chat.currentId = c.id; OS.chat.messages = []; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderAll(); } catch (e) { toast('新建会话失败：' + e.message, true); } };
 OS.chat.switch = async function(id) { if (Date.now() - _chatLongPress < 600) return; OS.chat.currentId = id; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderSessions(); const el = document.getElementById('chatMsgs'); if (el) el.innerHTML = '<div class="muted" style="margin:auto">加载中…</div>'; try { await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } catch (e) { OS.chat.messages = [{ role: 'assistant', content: '加载失败：' + e.message, error: true }]; } OS.chat.renderAll(); };
-OS.chat.setModel = function(v) { aiSet().model = v; saveDB(); toast('已切换模型'); };
+OS.chat.setModel = function(v) { aiSet().model = v; syncActiveAssistantBack(); saveDB(); toast('已切换模型'); };
+OS.chat.switchAssistant = function(id) {
+  const a = ensureAssistants().find((x) => x.id === id);
+  if (!a) return;
+  applyAssistant(a);
+  saveDB();
+  OS.chat.renderHeader(); OS.chat.renderMessages();
+  toast('已切换到 ' + (a.name || '助手'));
+};
+OS.chat.assistantMenu = function(e) {
+  const list = ensureAssistants();
+  const items = list.map((a) => ({ label: (a.id === DB.activeAssistantId ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchAssistant(\'' + a.id + '\')' }));
+  items.push({ label: '管理助手…', ico: '＋', fn: 'OS.closeMenu();OS.go(\'/settings/ai\')' });
+  menu(items, e.clientX, e.clientY);
+};
 OS.chat.sessionMenu = function(e, id) {
   const sid = id || OS.chat.currentId;
   const items = [ { label: '重命名', ico: '✎', fn: 'OS.closeMenu();OS.chat.renameSession(\'' + sid + '\')' }, { label: '置顶 / 取消置顶', ico: '📌', fn: 'OS.closeMenu();OS.chat.togglePinSession(\'' + sid + '\')' }, { label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();OS.chat.deleteSession(\'' + sid + '\')' } ];
@@ -2949,7 +3047,12 @@ OS.chat.sessionMenu = function(e, id) {
 // 顶栏 ⋯：模型选择 + 当前会话操作（需求 6：模型选择从顶栏移入菜单）
 OS.chat.topMenu = function(e) {
   const s = aiSet();
-  const items = MODELS.map(([v, label]) => ({ label: (v === s.model ? '✓ ' : '') + label, ico: '🤖', fn: 'OS.closeMenu();OS.chat.setModel(\'' + v + '\')' }));
+  const items = [];
+  items.push({ label: 'AI 助手', header: true });
+  ensureAssistants().forEach((a) => items.push({ label: (a.id === DB.activeAssistantId ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchAssistant(\'' + a.id + '\')' }));
+  items.push({ label: '模型', header: true });
+  MODELS.forEach(([v, label]) => items.push({ label: (v === s.model ? '✓ ' : '') + label, ico: '🤖', fn: 'OS.closeMenu();OS.chat.setModel(\'' + v + '\')' }));
+  items.push({ label: '会话', header: true });
   items.push({ label: '重命名', ico: '✎', fn: 'OS.closeMenu();OS.chat.renameSession(\'' + OS.chat.currentId + '\')' });
   items.push({ label: '置顶 / 取消置顶', ico: '📌', fn: 'OS.closeMenu();OS.chat.togglePinSession(\'' + OS.chat.currentId + '\')' });
   items.push({ label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();OS.chat.deleteSession(\'' + OS.chat.currentId + '\')' });
@@ -3100,6 +3203,7 @@ async function checkProactive() { try { const r = await fetch(API_BASE + '/api/p
 
 /* ================= INIT ================= */
 function init() {
+  ensureAssistants();
   applyTheme(); render();
   bindEdgeSwipe();
   window.addEventListener('hashchange', () => { OS.route = parseHash(); render(); AIBus.emit({ type: 'PAGE_CHANGED', entityType: 'page', payload: { route: OS.route } }); });

@@ -341,9 +341,14 @@
     .conv-item .c-last { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .conv-item .c-time { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
     .unread { min-width: 18px; height: 18px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
-    .bubble { max-width: 80%; padding: 11px 15px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-break: break-word; }
+    .bubble { max-width: 86%; padding: 11px 15px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-break: break-word; }
     .bubble.in { background: var(--card-solid); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
     .bubble.out { background: var(--accent); color: #fff; border-bottom-right-radius: 6px; align-self: flex-end; }
+    /* 气泡透明度只淡化背景、不影响文字（需求 8）：--bubble-alpha 仅作用于背景色 */
+    @supports (background: color-mix(in srgb, red 50%, transparent)) {
+      .bubble.in { background: color-mix(in srgb, var(--card-solid) calc(var(--bubble-alpha, 1) * 100%), transparent); }
+      .bubble.out { background: color-mix(in srgb, var(--accent) calc(var(--bubble-alpha, 1) * 100%), transparent); }
+    }
     .chat-input-bar { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
     .chat-input { flex: 1; resize: none; border: 1px solid var(--border); border-radius: 22px; padding: 10px 16px; font-size: 14px; outline: none; max-height: 110px; min-height: 42px; background: var(--card-solid); }
     .chat-input:focus { border-color: var(--accent-border); }
@@ -1006,8 +1011,10 @@ function render() {
   const topbar = document.getElementById('topbar');
   const r = OS.route;
   const isChat = r === '/chat';
-  // AI Chat 独占整屏：隐藏全局顶栏、view 去掉内边距，聊天自己的头部承担顶栏
+  // AI Chat 独占整屏：隐藏全局顶栏 + 全局 FAB（FAB 会与聊天发送按钮重叠），view 去掉内边距
   if (topbar) topbar.style.display = isChat ? 'none' : 'flex';
+  const fab = document.getElementById('fab');
+  if (fab) fab.style.display = isChat ? 'none' : 'flex';
   view.classList.toggle('view-chat', isChat);
   const routeChanged = _lastRoute !== r;
   if (routeChanged) { viewScrollPos[_lastRoute] = view.scrollTop; _lastRoute = r; }
@@ -2951,9 +2958,9 @@ function chatBubbleHtml(msg, isLast) {
   const clickable = msg.id && msg.content && !msg.thinking && !msg.error && !msg.pendingUser;
   return '<div class="chat-msg-row" style="display:flex;' + (isUser ? 'flex-direction:row-reverse' : '') + ';gap:8px;align-items:flex-start">' +
     '<div class="avatar" style="width:30px;height:30px;flex-shrink:0;' + (avatar ? 'background-image:url(' + avatar + ')' : '') + '">' + (avatar ? '' : (isUser ? '🙂' : '♥')) + '</div>' +
-    '<div style="max-width:80%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
+    '<div style="max-width:86%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
     quote +
-    '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="opacity:' + (s.bubbleOpacity || 0.9) + ';cursor:' + (clickable ? 'pointer' : 'default') + '"' + (clickable ? ' onclick="OS.chat.bubbleMenu(event,\'' + msg.id + '\')"' : '') + '>' + bubble + '</div></div></div>';
+    '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="--bubble-alpha:' + (s.bubbleOpacity || 0.9) + ';cursor:' + (clickable ? 'pointer' : 'default') + '"' + (clickable ? ' onclick="OS.chat.bubbleMenu(event,\'' + msg.id + '\')" ontouchstart="OS.chat.bubblePressStart(event,\'' + msg.id + '\')" ontouchmove="OS.chat.bubblePressMove()" ontouchend="OS.chat.bubblePressEnd()" ontouchcancel="OS.chat.bubblePressEnd()"' : '') + '>' + bubble + '</div></div></div>';
 }
 OS.chat.loaded = false;
 OS.chat.quotedDynamic = null; // 引用 AI 动态（需求 33）：{ id, type:'ai_dynamic', content, createdAt }
@@ -3133,25 +3140,73 @@ OS.chat.copyMsgById = async function(id) {
 };
 OS.chat.saveAsNote = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) saveAsNote(m.content); };
 OS.chat.createTask = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) createTaskFromContent(m.content.slice(0, 80)); };
-// 需求 5：点击气泡 → 轻量操作菜单；点其他气泡/空白自动关闭（复用全局 menu() 的点击外关闭）
-OS.chat.bubbleMenu = function(e, id) {
-  if (e && e.stopPropagation) e.stopPropagation();
+// 需求 5/11/13：统一构造消息操作项（点击菜单 / 长按底部抽屉共用），并补上「删除消息」
+OS.chat.messageActions = function(id) {
   const m = OS.chat.messages.find((x) => x.id === id);
-  if (!m || !m.content) return;
+  if (!m || !m.content) return [];
+  const close = 'OS.closeModal();OS.closeMenu();';
   const items = [];
   if (m.role === 'user') {
-    items.push({ label: '编辑', ico: '✎', fn: 'OS.closeMenu();OS.chat.editMessage(\'' + id + '\')' });
-    items.push({ label: '复制', ico: '⧉', fn: 'OS.closeMenu();OS.chat.copyMsgById(\'' + id + '\')' });
-    items.push({ label: '重新生成', ico: '↻', fn: 'OS.closeMenu();OS.chat.regenerateFrom(\'' + id + '\')' });
+    items.push({ label: '编辑', ico: '✎', fn: close + 'OS.chat.editMessage(\'' + id + '\')' });
+    items.push({ label: '复制', ico: '⧉', fn: close + 'OS.chat.copyMsgById(\'' + id + '\')' });
+    items.push({ label: '重新生成', ico: '↻', fn: close + 'OS.chat.regenerateFrom(\'' + id + '\')' });
   } else {
-    items.push({ label: '复制', ico: '⧉', fn: 'OS.closeMenu();OS.chat.copyMsgById(\'' + id + '\')' });
+    items.push({ label: '复制', ico: '⧉', fn: close + 'OS.chat.copyMsgById(\'' + id + '\')' });
     let lastAi = -1; for (let i = OS.chat.messages.length - 1; i >= 0; i--) if (OS.chat.messages[i].role === 'assistant') { lastAi = i; break; }
-    if (OS.chat.messages[lastAi] === m) items.push({ label: '重新输出', ico: '↻', fn: 'OS.closeMenu();OS.chat.regenerate()' });
-    items.push({ label: '存为笔记', ico: '✎', fn: 'OS.closeMenu();OS.chat.saveAsNote(\'' + id + '\')' });
-    items.push({ label: '生成任务', ico: '✓', fn: 'OS.closeMenu();OS.chat.createTask(\'' + id + '\')' });
+    if (OS.chat.messages[lastAi] === m) items.push({ label: '重新输出', ico: '↻', fn: close + 'OS.chat.regenerate()' });
+    items.push({ label: '存为笔记', ico: '✎', fn: close + 'OS.chat.saveAsNote(\'' + id + '\')' });
+    items.push({ label: '生成任务', ico: '✓', fn: close + 'OS.chat.createTask(\'' + id + '\')' });
   }
+  items.push({ label: '删除消息', ico: '🗑', danger: true, fn: close + 'OS.chat.deleteMessage(\'' + id + '\')' });
+  return items;
+};
+// 点击气泡 → 轻量操作菜单；点其他气泡/空白自动关闭（复用全局 menu() 的点击外关闭）
+OS.chat.bubbleMenu = function(e, id) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (_chatMsgPress.suppressClick) { _chatMsgPress.suppressClick = false; return; }
+  const items = OS.chat.messageActions(id);
+  if (!items.length) return;
   menu(items, e.clientX, e.clientY);
 };
+// 长按气泡 → 底部抽屉（移动端）；复用同一套操作项
+OS.chat.messageSheet = function(id) {
+  const items = OS.chat.messageActions(id);
+  if (!items.length) return;
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    items.map((it) => '<button class="sheet-item" style="' + (it.danger ? 'color:#c0392b' : '') + '" onclick="' + it.fn + '"><span class="ico">' + it.ico + '</span>' + esc(it.label) + '</button>').join('') +
+    '</div>', 'bottom');
+};
+OS.chat.deleteMessage = function(id) {
+  const m = OS.chat.messages.find((x) => x.id === id);
+  if (!m) return;
+  confirmDialog('删除消息', '删除这条消息？', async () => {
+    OS.chat.messages = OS.chat.messages.filter((x) => x.id !== id); // 乐观移除
+    OS.chat.renderAll();
+    try {
+      const r = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages/' + id, { method: 'DELETE' });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || ('HTTP ' + r.status)); }
+      toast('已删除 ✓');
+    } catch (e) {
+      toast('删除失败：' + e.message, true);
+      await OS.chat.loadMessages(); OS.chat.renderAll(); // 回滚到服务端真实状态
+    }
+  }, '删除');
+};
+// 移动端长按气泡（500ms）打开底部抽屉；滑动则取消；长按后吞掉紧随的 click
+let _chatMsgPress = { id: null, timer: null, moved: false, suppressClick: false };
+OS.chat.bubblePressStart = function(e, id) {
+  _chatMsgPress.id = id; _chatMsgPress.moved = false; _chatMsgPress.suppressClick = false;
+  clearTimeout(_chatMsgPress.timer);
+  _chatMsgPress.timer = setTimeout(() => {
+    if (!_chatMsgPress.moved && _chatMsgPress.id === id) {
+      _chatMsgPress.suppressClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+      OS.chat.messageSheet(id); _chatMsgPress.id = null;
+    }
+  }, 500);
+};
+OS.chat.bubblePressMove = function() { _chatMsgPress.moved = true; };
+OS.chat.bubblePressEnd = function() { clearTimeout(_chatMsgPress.timer); };
 // 需求 4B：编辑单条用户消息，改后重新发送，不产生重复消息
 OS.chat.editMessage = function(id) {
   const m = OS.chat.messages.find((x) => x.id === id);
@@ -3201,11 +3256,24 @@ function createTaskFromContent(content) {
 }
 async function checkProactive() { try { const r = await fetch(API_BASE + '/api/proactive'); if (!r.ok) return; const data = await r.json(); if (data.sent) pushNotification('ai', aiSet().aiName || 'AI', (data.message && data.message.content) || '来了一条主动消息'); } catch (e) {} }
 
+/* ---- iPhone Safari 键盘：100dvh 在键盘弹出时不一定缩小，用 visualViewport 把聊天输入栏顶到键盘上方（需求 4） ---- */
+function bindKeyboardViewport() {
+  if (!window.visualViewport) return;
+  const apply = () => {
+    const stage = document.querySelector('.chat-stage');
+    if (!stage) return;
+    stage.style.height = window.visualViewport.height + 'px';
+  };
+  window.visualViewport.addEventListener('resize', apply);
+  window.visualViewport.addEventListener('scroll', apply);
+}
+
 /* ================= INIT ================= */
 function init() {
   ensureAssistants();
   applyTheme(); render();
   bindEdgeSwipe();
+  bindKeyboardViewport();
   window.addEventListener('hashchange', () => { OS.route = parseHash(); render(); AIBus.emit({ type: 'PAGE_CHANGED', entityType: 'page', payload: { route: OS.route } }); });
   setTimeout(() => { const sp = document.getElementById('splash'); if (sp) { sp.classList.add('fade-out'); setTimeout(() => sp.remove(), 700); } }, 2500);
   checkProactive();
@@ -3767,10 +3835,52 @@ function aiNewMemory() { modal('<div class="modal-head"><h3>新增记忆</h3><bu
 function aiNewMemorySave() { const c = document.getElementById('amNewContent').value.trim(); if (!c) { toast('内容不能为空', true); return; } aiAddMemory(c, document.getElementById('amNewCat').value.trim() || '偏好', 'manual', null); closeModal(); render(); toast('已记住 ♥'); }
 function viewAIMemory() {
   const list = DB.ai.memories || [];
-  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">AI 记忆</div><div class="muted">祂记住的关于你的事情</div></div><button class="btn btn-primary" onclick="aiNewMemory()">＋ 新增</button></div>';
-  html += '<div class="muted" style="font-size:12px;margin-bottom:10px">只记长期偏好、习惯、明确「记住」请求和重要信息，不记每句话。</div>';
+  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">AI 记忆</div><div class="muted">祂记住的关于你的事情</div></div>' +
+    '<div class="row" style="gap:8px"><button class="btn btn-soft" onclick="document.getElementById(\'memImportFile\').click()">⬆ 导入</button><button class="btn btn-primary" onclick="aiNewMemory()">＋ 新增</button></div></div>';
+  html += '<input type="file" id="memImportFile" accept=".txt,.md,.json,text/plain,text/markdown,application/json,application/pdf" style="display:none" onchange="aiImportMemory(this)">';
+  html += '<div class="muted" style="font-size:12px;margin-bottom:10px">只记长期偏好、习惯、明确「记住」请求和重要信息，不记每句话。支持导入 txt / md / json。</div>';
   html += '<div>' + (list.length ? list.map(aiMemoryItemHtml).join('') : '<div class="empty"><div class="eico">🧠</div><div class="etitle">还没有记忆</div><div class="esub">和祂聊聊，或点击右上角主动告诉祂</div></div>') + '</div>';
   return html;
+}
+// 从 txt / md / json 批量导入长期记忆（去重 + 上限 200，避免一次灌入过多）。
+// PDF 是二进制，浏览器 readAsText 读不出正文，诚实提示转成文本再导入，绝不用乱码冒充记忆。
+function aiImportMemory(input) {
+  const file = input.files[0]; if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const isPdf = ext === 'pdf' || file.type === 'application/pdf';
+  const read = () => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.onerror = rej; r.readAsText(file); });
+  read().then((text) => {
+    if (!text.trim()) { toast('文件为空', true); return; }
+    let items = [];
+    if (ext === 'json') {
+      try {
+        const data = JSON.parse(text);
+        const arr = Array.isArray(data) ? data : (data && Array.isArray(data.memories) ? data.memories : []);
+        items = arr.map((x) => {
+          if (typeof x === 'string') return { content: x.trim(), category: '导入' };
+          const o = x && typeof x === 'object' ? x : {};
+          return { content: String(o.content || o.title || o.text || '').trim(), category: String(o.category || '导入') };
+        }).filter((x) => x.content);
+      } catch (e) { toast('JSON 解析失败：' + e.message, true); return; }
+    } else {
+      const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      items = lines.map((l) => ({ content: l.replace(/^[\s\-*#>]+/, '').trim(), category: '导入' })).filter((x) => x.content && x.content.length >= 2);
+    }
+    if (!items.length) {
+      toast(isPdf ? 'PDF 无法直接导入（浏览器读不出 PDF 正文），请先导出为 txt / md / json 再导入' : '没有可导入的内容', true);
+      return;
+    }
+    const mems = DB.ai.memories || (DB.ai.memories = []);
+    const existing = new Set(mems.map((m) => m.content));
+    let added = 0;
+    for (const it of items) {
+      if (existing.has(it.content) || added >= 200) continue;
+      mems.unshift({ id: uid(), content: it.content, category: it.category, sourceType: 'manual', sourceId: null, confidence: 0.8, createdAt: Date.now(), updatedAt: Date.now() });
+      existing.add(it.content); added++;
+    }
+    if (added === 0) { toast('这些内容都已经记住过了', true); input.value = ''; return; }
+    saveDB(); input.value = ''; render(); toast('已导入 ' + added + ' 条记忆 ♥');
+  }).catch(() => { toast('读取文件失败', true); });
 }
 
 /* ---- AI 状态页 ---- */

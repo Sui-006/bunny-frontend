@@ -2836,15 +2836,41 @@ const WeatherProvider = {
 function setMockWeather(text, temp, code) { DB.weather = { text, temp, code, source: 'mock', updatedAt: Date.now() }; saveDB(); render(); toast('已更新天气（Mock）'); WeatherProvider.evaluate(DB.weather); }
 
 const LocationProvider = {
+  // 优先走高德定位：先 IP 定位（国内稳定、即时、城市级，无需浏览器定位权限）；
+  // 浏览器 GPS 仅在高德不可用时兜底（国内 Chrome/Edge 依赖 Google 定位服务常超时）。
   async getCurrentLocation() {
+    const ipLoc = await this.ipLocation();
+    if (ipLoc) return ipLoc;
+    const gps = await this.gpsLocation();
+    if (gps && gps.lat) { DB.location = gps; saveDB(); return gps; }
+    return this.mock();
+  },
+  // 高德 IP 定位（城市级）
+  async ipLocation() {
+    try {
+      const r = await fetch(API_BASE + '/api/ip-location');
+      if (r.ok) {
+        const d = (await r.json()).data;
+        if (d && (d.city || d.province)) {
+          const loc = { city: d.city || d.province, lat: d.lat || null, lng: d.lng || null, source: 'ip', updatedAt: Date.now() };
+          DB.location = loc; saveDB(); return loc;
+        }
+      }
+    } catch (e) {}
+    return null;
+  },
+  // 浏览器 GPS（精确坐标，兜底）
+  gpsLocation() {
     return new Promise((resolve) => {
-      if (!('geolocation' in navigator)) return resolve(this.mock());
+      if (!('geolocation' in navigator)) return resolve(null);
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
         const city = await this.reverseGeocode(lat, lng);
-        const loc = { city, lat, lng, source: 'geolocation', updatedAt: Date.now() };
-        DB.location = loc; saveDB(); resolve(loc);
-      }, () => resolve(this.mock()), { timeout: 8000 });
+        resolve({ city, lat, lng, source: 'geolocation', updatedAt: Date.now() });
+      }, (err) => {
+        try { console.warn('[location] 浏览器 GPS 不可用:', err && err.code, err && err.message); } catch (e) {}
+        resolve(null);
+      }, { timeout: 8000, maximumAge: 5 * 60 * 1000 });
     });
   },
   async reverseGeocode(lat, lng) {
@@ -3033,7 +3059,7 @@ function aiLocationModal() {
 function aiLocationAllow() {
   aiPerm().location = true; saveDB();
   LocationProvider.getCurrentLocation().then(async (loc) => {
-    toast('定位成功：' + esc(loc.city)); render();
+    toast('定位成功：' + esc(loc.city) + (loc.source === 'ip' ? '（高德 IP 大致定位）' : '')); render();
     AIBus.emit({ type: 'LOCATION_CHANGED', entityType: 'location', payload: loc });
     // 拿到位置后顺手拉一次真实天气
     const w = await WeatherProvider.fetchReal();

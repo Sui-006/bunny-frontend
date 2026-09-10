@@ -89,17 +89,21 @@
     ::-webkit-scrollbar-thumb { background: rgba(140,160,180,0.35); border-radius: 8px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(140,160,180,0.55); }
 
-    .app { display: flex; height: 100vh; width: 100%; }
-    .scrim { position: fixed; inset: 0; background: rgba(15,23,35,0.4); z-index: 80; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(2px); }
+    .app { display: block; height: 100vh; width: 100%; }
+    .scrim { position: fixed; inset: 0; background: rgba(15,23,35,0.4); z-index: 110; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(2px); }
     .scrim.show { opacity: 1; pointer-events: auto; }
 
-    /* ============ Sidebar ============ */
+    /* ============ Sidebar（fixed overlay drawer，绝不挤压主内容） ============ */
     .sidebar {
-      width: var(--sidebar-w); height: 100vh; flex-shrink: 0;
+      position: fixed; left: 0; top: 0; bottom: 0; z-index: 120;
+      width: var(--sidebar-w); max-width: 86vw; height: 100%;
       background: var(--accent-bg); border-right: 1px solid var(--accent-line);
       display: flex; flex-direction: column; padding: calc(18px + env(safe-area-inset-top)) 12px 12px;
-      position: relative; z-index: 90;
+      transform: translateX(-102%);
+      transition: transform 0.28s ease;
+      box-shadow: 2px 0 20px rgba(0,0,0,0.12);
     }
+    .sidebar.open { transform: translateX(0); }
     .logo {
       font-size: 18px; font-weight: 700; letter-spacing: 1px; color: var(--accent);
       padding: 6px 12px 14px; display: flex; align-items: center; gap: 8px;
@@ -130,7 +134,7 @@
     .nav-foot { border-top: 1px solid var(--accent-line); padding-top: 8px; }
 
     /* ============ Main / Topbar ============ */
-    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; position: relative; }
+    .main { width: 100%; display: flex; flex-direction: column; min-width: 0; height: 100vh; position: relative; }
     .main .bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 1; pointer-events: none; z-index: 0; transition: opacity 0.3s; }
     .topbar {
       height: calc(var(--topbar-h) + env(safe-area-inset-top)); flex-shrink: 0; display: flex; align-items: center; gap: 12px;
@@ -139,7 +143,7 @@
       border-bottom: 1px solid var(--border);
     }
     html[data-theme="dark"] .topbar { background: rgba(18,25,34,0.55); }
-    .menu-btn { background: none; border: none; font-size: 22px; color: var(--accent); cursor: pointer; display: none; line-height: 1; }
+    .menu-btn { background: none; border: none; font-size: 22px; color: var(--accent); cursor: pointer; display: block; line-height: 1; }
     .topbar-title { font-size: 17px; font-weight: 700; color: var(--accent-strong); }
     .topbar-sub { font-size: 12px; color: var(--text-faint); }
     .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -371,6 +375,19 @@
     .session-item .s-menu { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 15px; padding: 2px 5px; border-radius: 8px; flex-shrink: 0; }
     .session-item .s-menu:hover { color: var(--accent-strong); background: var(--accent-tint); }
 
+    /* 会话列表（overlay drawer，绝不挤压气泡宽度） */
+    .chat-sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; z-index: 116;
+      width: 264px; max-width: 84vw; height: 100%;
+      background: var(--card-solid); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: calc(12px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
+      transform: translateX(-102%); transition: transform 0.28s ease;
+      box-shadow: 2px 0 20px rgba(0,0,0,0.14);
+    }
+    .chat-sidebar.open { transform: translateX(0); }
+    .chat-scrim { position: fixed; inset: 0; background: rgba(15,23,35,0.35); z-index: 115; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .chat-scrim.show { opacity: 1; pointer-events: auto; }
+
     /* 播放器底部抽屉 */
     .player-sheet-cover { width: 120px; height: 120px; border-radius: 16px; background-size: cover; background-position: center; box-shadow: 0 12px 30px rgba(0,0,0,0.25); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 44px; color: rgba(255,255,255,0.9); }
     .player-sheet-list { max-height: 220px; overflow-y: auto; }
@@ -472,9 +489,6 @@
 
     /* responsive */
     @media (max-width: 900px) {
-      .sidebar { position: fixed; left: -280px; top: 0; bottom: 0; transition: left 0.28s ease; box-shadow: 2px 0 20px rgba(0,0,0,0.12); }
-      .sidebar.open { left: 0; }
-      .menu-btn { display: block; }
       .fab { bottom: calc(24px + env(safe-area-inset-bottom)); }
       .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
       .view { padding: 16px 14px calc(90px + env(safe-area-inset-bottom)); }
@@ -488,9 +502,6 @@
       .topbar { padding: 0 12px; }
       .h1 { font-size: 22px; }
       .album { width: 170px; height: 170px; }
-    }
-    @media (min-width: 901px) {
-      .menu-btn { display: none; }
     }
   </style>
 </head>
@@ -831,6 +842,29 @@ function menu(items, x, y) {
 }
 function closeMenu() { document.getElementById('menuRoot').innerHTML = ''; }
 
+/* ---- iOS 左边缘右滑打开 Sidebar（需求 9/11）：阻止浏览器返回、不产生历史记录 ---- */
+let _edgeStart = null;
+function bindEdgeSwipe() {
+  const EDGE = 26, TRIGGER = 56;
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { _edgeStart = null; return; }
+    const t = e.touches[0]; const sb = document.getElementById('sidebar');
+    _edgeStart = (t.clientX <= EDGE && sb && !sb.classList.contains('open')) ? { x: t.clientX, y: t.clientY } : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!_edgeStart) return;
+    const t = e.touches[0]; const dx = t.clientX - _edgeStart.x, dy = t.clientY - _edgeStart.y;
+    // 明确是「左边缘向右横滑」时阻止原生返回手势
+    if (dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.4 && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
+    if (!_edgeStart) return;
+    const t = e.changedTouches[0]; const dx = t.clientX - _edgeStart.x, dy = t.clientY - _edgeStart.y;
+    _edgeStart = null;
+    if (dx > TRIGGER && Math.abs(dx) > Math.abs(dy) * 1.4) OS.toggleSidebar(true);
+  });
+}
+
 /* ---------------- router ---------------- */
 const ROUTES = {
   '/today': 'Home', '/tasks': '任务', '/calendar': '日历', '/alarm': '闹钟', '/plans': '计划',
@@ -855,7 +889,14 @@ const OS = {
   ui: { search: '', calView: 'month', viewDate: todayStr(), statRange: 7, healthRange: 7, healthDate: todayStr(), notesQuery: '', convId: null, taskView: 'today' },
   chat: { sessions: [], currentId: null, messages: [], attachments: [], sessionSettings: {}, loading: false },
 
-  go(route) { location.hash = route; },
+  // 需求 10/12：用 replaceState 改 hash，不推入历史记录，避免「页面层叠 + 右滑返回上一页」。
+  go(route) {
+    if (location.hash === '#' + route) return;
+    try { history.replaceState(null, '', '#' + route); } catch (e) { location.replace('#' + route); }
+    OS.route = parseHash();
+    render();
+    AIBus.emit({ type: 'PAGE_CHANGED', entityType: 'page', payload: { route: OS.route } });
+  },
   toggleSidebar(force) {
     const sb = document.getElementById('sidebar'); const sc = document.getElementById('scrim');
     const open = force != null ? force : !sb.classList.contains('open');
@@ -1634,7 +1675,7 @@ function habitMenu(e, id) {
   ];
   menu(items, e.clientX, e.clientY);
 }
-function deleteHabit(id) { DB.habits = DB.habits.filter((h) => h.id !== id); saveDB(); render(); }
+function deleteHabit(id) { const h = habitById(id); DB.habits = DB.habits.filter((x) => x.id !== id); saveDB(); render(); if (h) AIBus.emit({ type: 'HABIT_DELETED', entityType: 'habit', entityId: id, payload: h }); }
 function viewHabit() {
   const done = DB.habits.filter((h) => isHabitDone(h, todayStr())).length;
   let html = '<div class="spread" style="margin-bottom:18px"><div><div class="h1">Habit</div><div class="muted">Today · 已完成 ' + done + ' / ' + DB.habits.length + '</div></div><button class="btn btn-primary" onclick="newHabitModal()">＋ 新建习惯</button></div>';
@@ -1657,10 +1698,11 @@ function habitModal(id) {
 function saveHabit(id) {
   const name = document.getElementById('hbName').value.trim(); if (!name) { toast('请输入名称', true); return; }
   const data = { name, description: document.getElementById('hbDesc').value.trim(), icon: document.getElementById('hbIcon').value.trim() || '⭐', color: document.getElementById('swVal').value, frequency: document.getElementById('hbFreq').value, goal: +document.getElementById('hbGoal').value || null, reminderTime: document.getElementById('hbTime').value };
-  if (id) Object.assign(habitById(id), data);
-  else DB.habits.push({ id: uid(), streak: 0, completions: [], createdAt: Date.now(), ...data });
+  let h;
+  if (id) { h = habitById(id); Object.assign(h, data); }
+  else { h = { id: uid(), streak: 0, completions: [], createdAt: Date.now(), ...data }; DB.habits.push(h); }
   saveDB(); closeModal(); render(); toast('已保存 ✓');
-  AIBus.emit({ type: id ? 'HABIT_UPDATED' : 'HABIT_UPDATED', entityType: 'habit', entityId: id || DB.habits[DB.habits.length - 1].id });
+  AIBus.emit({ type: id ? 'HABIT_UPDATED' : 'HABIT_CREATED', entityType: 'habit', entityId: h.id, payload: h });
 }
 
 /* ================= HEALTH ================= */
@@ -1724,6 +1766,7 @@ function setHeightInline(v) {
   if (!DB.healthProfile) DB.healthProfile = { height: null };
   DB.healthProfile.height = Number.isFinite(h) && h > 0 ? h : null;
   saveDB(); toast('身高已保存 ✓');
+  AIBus.emit({ type: 'HEALTH_UPDATED', entityType: 'health', entityId: 'profile', payload: { field: 'height', value: DB.healthProfile.height } });
 }
 function setWeightInline(v) {
   const w = parseFloat(v);
@@ -1731,6 +1774,7 @@ function setWeightInline(v) {
   rec.weight = Number.isFinite(w) && w > 0 ? w : null;
   rec.updatedAt = Date.now();
   saveDB(); render(); toast('体重已保存 ✓');
+  AIBus.emit({ type: 'HEALTH_UPDATED', entityType: 'health', entityId: rec.id, payload: { field: 'weight', value: rec.weight } });
 }
 // 各健康模块独立记录弹窗（需求 14）：sleep / water / weight / diet / exercise
 function openHealthModule(module) {
@@ -1770,6 +1814,8 @@ function saveHealthModule(id, module) {
   else rec.caloriesOut = Math.max(0, +document.getElementById('hlCalOut').value || 0);
   rec.updatedAt = Date.now();
   saveDB(); closeModal(); render(); toast('已保存 ✓');
+  const FIELD = { sleep: 'sleep', water: 'water', weight: 'weight', diet: 'caloriesIn', exercise: 'caloriesOut' }[module];
+  AIBus.emit({ type: 'HEALTH_UPDATED', entityType: 'health', entityId: id, payload: { field: module, value: FIELD ? rec[FIELD] : null } });
 }
 async function aiEstimateCalories(kind) {
   const isIn = kind === 'in';
@@ -2475,8 +2521,8 @@ function pstat(v, label, route) { return '<div class="card stat-card" style="cur
 function editProfile() {
   modal('<div class="modal-head"><h3>编辑资料</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>昵称</label><input class="input" id="pfName" value="' + esc(DB.profile.name) + '"></div><div class="field"><label>个性签名</label><textarea class="textarea" id="pfSig">' + esc(DB.profile.signature) + '</textarea></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveProfile()">保存</button></div>');
 }
-function saveProfile() { DB.profile.name = document.getElementById('pfName').value.trim(); DB.profile.signature = document.getElementById('pfSig').value.trim(); saveDB(); closeModal(); render(); }
-async function changeProfileAvatar(input) { if (!input.files[0]) return; DB.profile.avatar = await cropSquareImage(input.files[0]); saveDB(); render(); }
+function saveProfile() { DB.profile.name = document.getElementById('pfName').value.trim(); DB.profile.signature = document.getElementById('pfSig').value.trim(); saveDB(); closeModal(); render(); AIBus.emit({ type: 'PROFILE_UPDATED', entityType: 'profile', entityId: 'profile', payload: { name: DB.profile.name, signature: DB.profile.signature } }); }
+async function changeProfileAvatar(input) { if (!input.files[0]) return; DB.profile.avatar = await cropSquareImage(input.files[0]); saveDB(); render(); AIBus.emit({ type: 'PROFILE_UPDATED', entityType: 'profile', entityId: 'profile', payload: { avatar: true } }); }
 
 /* ================= SETTINGS (main) ================= */
 function viewSettings() {
@@ -2759,7 +2805,11 @@ function toggleNotif(k) { const s = notifSet(); s[k] = !s[k]; saveDB(); render()
 
 /* ================= AI CHAT (backend sessions/messages, ported) ================= */
 function newTaskModal() { openTaskModal(); }
-const MODEL_OPTS = '<optgroup label="DeepSeek"><option value="deepseek-chat">DeepSeek Chat</option><option value="deepseek-reasoner">DeepSeek Reasoner</option></optgroup><optgroup label="OpenAI"><option value="gpt-4o">GPT-4o</option><option value="gpt-4o-mini">GPT-4o mini</option></optgroup><optgroup label="Claude"><option value="claude-sonnet-5">Claude Sonnet 5</option><option value="claude-opus-5">Claude Opus 5</option></optgroup>';
+const MODELS = [
+  ['deepseek-chat', 'DeepSeek Chat'], ['deepseek-reasoner', 'DeepSeek Reasoner'],
+  ['gpt-4o', 'GPT-4o'], ['gpt-4o-mini', 'GPT-4o mini'],
+  ['claude-sonnet-5', 'Claude Sonnet 5'], ['claude-opus-5', 'Claude Opus 5'],
+];
 
 function viewChat() {
   const s = aiSet();
@@ -2769,27 +2819,25 @@ function viewChat() {
   let bgStyle = '';
   if (bg && bg.type === 'solid' && bg.color) bgStyle = 'background:' + bg.color;
   else if (bg && bg.type === 'image' && bg.url) bgStyle = 'background-image:url(' + bg.url + ')';
-  return '<div class="chat-stage" style="height:calc(100vh - var(--topbar-h) - 40px);border-radius:18px;border:1px solid var(--border);overflow:hidden">' +
+  return '<div class="chat-scrim" id="chatScrim" onclick="OS.chat.toggleSidebar(false)"></div>' +
+    '<div class="chat-sidebar" id="chatSidebar">' +
+    '<button class="btn btn-sm btn-primary" style="width:100%;margin-bottom:10px" onclick="OS.chat.newChat()">＋ 新对话</button>' +
+    '<div class="session-list" id="chatSessions"></div>' +
+    '</div>' +
+    '<div class="chat-stage" style="height:calc(100vh - var(--topbar-h) - 40px);border-radius:18px;border:1px solid var(--border);overflow:hidden">' +
     (bgStyle ? '<div class="chat-bg" style="' + bgStyle + '"></div>' : '') +
     '<div class="chat-bg-overlay"></div>' +
-    // 顶部：[☰] [头像] 标题 [右侧功能]（需求 3）
+    // 顶部：[☰] [头像] 标题 [⋯]（需求 6：只保留这三个元素，模型选择并入 ⋯ 菜单）
     '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">' +
     '<button class="icon-btn" onclick="OS.chat.toggleSidebar()" title="会话列表">☰</button>' +
     '<div class="avatar" style="width:30px;height:30px;font-size:14px;flex-shrink:0;' + (s.assistantAvatar ? 'background-image:url(' + s.assistantAvatar + ')' : '') + '" onclick="OS.go(\'/settings/ai\')">' + (s.assistantAvatar ? '' : '♥') + '</div>' +
     '<div class="grow" style="min-width:0"><div id="chatTitle" style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title) + '</div><div class="muted" style="font-size:11px">' + esc(s.aiName || '♥ 我的AI') + '</div></div>' +
-    '<select id="chatModel" class="select" style="width:auto;padding:5px 8px;font-size:12px" onchange="OS.chat.changeModel()">' + MODEL_OPTS.replace('value="' + s.model + '"', 'value="' + s.model + '" selected') + '</select>' +
-    '<button class="icon-btn" onclick="OS.chat.sessionMenu(event, OS.chat.currentId)" title="会话操作">⋯</button>' +
+    '<button class="icon-btn" onclick="OS.chat.topMenu(event)" title="模型 / 会话操作">⋯</button>' +
     '</div>' +
-    // 主体：侧栏会话列表 + 消息区
-    '<div style="flex:1;display:flex;min-height:0">' +
-    '<div id="chatSidebar" style="display:none;width:230px;border-right:1px solid var(--border);overflow-y:auto;padding:10px;flex-shrink:0">' +
-    '<button class="btn btn-sm btn-primary" style="width:100%;margin-bottom:10px" onclick="OS.chat.newChat()">＋ 新对话</button>' +
-    '<div class="session-list" id="chatSessions"></div>' +
-    '</div>' +
+    // 消息区（单列，去掉会挤压气泡的侧栏）
     '<div style="flex:1;display:flex;flex-direction:column;min-width:0">' +
     '<div id="chatAttach" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border)"></div>' +
     '<div id="chatMsgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px"><div class="muted" style="text-align:center;margin:auto">正在连接 AI…</div></div>' +
-    '</div>' +
     '</div>' +
     // 引用动态卡片 + 输入栏
     '<div>' +
@@ -2815,25 +2863,28 @@ function chatBubbleHtml(msg, isLast) {
   // 引用 AI 动态（需求 33）：消息 metadata.quotedDynamic
   const qd = msg.quotedDynamic;
   const quote = qd ? '<div class="quote-card" style="margin:0 0 6px"><span style="flex-shrink:0">↳</span><div class="q-body">引用动态 · ' + esc(String(qd.content || '')) + '</div></div>' : '';
-  // 操作：小图标、淡色、默认隐藏，hover/点击出现（需求 6），不删除任何功能
-  const actions = (!isUser && !msg.thinking && !msg.error && msg.content)
-    ? '<div class="chat-actions">' +
-      '<button class="mini-act" onclick="OS.chat.copyMsg(this,\'' + msg.id + '\')">⧉ 复制</button>' +
-      (isLast ? '<button class="mini-act" onclick="OS.chat.regenerate()">↻ 重新输出</button>' : '') +
-      '<button class="mini-act" onclick="saveAsNote(this.closest(\'.bubble\').innerText)">✎ 笔记</button>' +
-      '<button class="mini-act" onclick="createTaskFromAi()">✓ 任务</button>' +
-      '</div>' : '';
+  // 需求 5：点击气泡才出现轻量操作菜单（不再常驻 hover，也不改变气泡本身）
+  const clickable = msg.id && msg.content && !msg.thinking && !msg.error && !msg.pendingUser;
   return '<div class="chat-msg-row" style="display:flex;' + (isUser ? 'flex-direction:row-reverse' : '') + ';gap:8px;align-items:flex-start">' +
     '<div class="avatar" style="width:30px;height:30px;flex-shrink:0;' + (avatar ? 'background-image:url(' + avatar + ')' : '') + '">' + (avatar ? '' : (isUser ? '🙂' : '♥')) + '</div>' +
     '<div style="max-width:85%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
     quote +
-    '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="opacity:' + (s.bubbleOpacity || 0.9) + '">' + bubble + '</div>' + actions + '</div></div>';
+    '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="opacity:' + (s.bubbleOpacity || 0.9) + ';cursor:' + (clickable ? 'pointer' : 'default') + '"' + (clickable ? ' onclick="OS.chat.bubbleMenu(event,\'' + msg.id + '\')"' : '') + '>' + bubble + '</div></div></div>';
 }
 OS.chat.loaded = false;
 OS.chat.quotedDynamic = null; // 引用 AI 动态（需求 33）：{ id, type:'ai_dynamic', content, createdAt }
 OS.chat.sidebarOpen = false;
 let _chatLongPress = 0;
-OS.chat.toggleSidebar = function() { OS.chat.sidebarOpen = !OS.chat.sidebarOpen; const el = document.getElementById('chatSidebar'); if (el) el.style.display = OS.chat.sidebarOpen ? '' : 'none'; };
+OS.chat.toggleSidebar = function(force) {
+  const open = force != null ? force : !OS.chat.sidebarOpen;
+  OS.chat.sidebarOpen = open;
+  OS.chat.syncSidebar();
+};
+OS.chat.syncSidebar = function() {
+  const el = document.getElementById('chatSidebar'); const sc = document.getElementById('chatScrim');
+  if (el) el.classList.toggle('open', !!OS.chat.sidebarOpen);
+  if (sc) sc.classList.toggle('show', !!OS.chat.sidebarOpen);
+};
 // 引用动态卡片（显示在输入框上方，× 取消）
 OS.chat.quoteCardHtml = function() {
   const q = OS.chat.quotedDynamic;
@@ -2869,7 +2920,7 @@ OS.chat.renderMessages = function() {
   el.innerHTML = OS.chat.messages.map((m, i) => chatBubbleHtml(m, i === lastAi)).join('');
   el.scrollTop = el.scrollHeight;
 };
-OS.chat.renderAll = function() { OS.chat.renderSessions(); OS.chat.renderMessages(); OS.chat.renderHeader(); };
+OS.chat.renderAll = function() { OS.chat.renderSessions(); OS.chat.renderMessages(); OS.chat.renderHeader(); OS.chat.syncSidebar(); };
 OS.chat.init = async function() {
   try {
     const resp = await fetch(API_BASE + '/api/sessions'); if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -2887,12 +2938,21 @@ OS.chat.createSession = async function(name) { const r = await fetch(API_BASE + 
 OS.chat.loadMessages = async function() { const r = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages?limit=500'); if (!r.ok) throw new Error('HTTP ' + r.status); OS.chat.messages = ((await r.json()).messages || []).filter((m) => m.visible !== false).map(chatMapMessage); };
 OS.chat.loadSessionSettings = async function() { try { const r = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/settings'); OS.chat.sessionSettings = r.ok ? ((await r.json()).settings || {}) : {}; } catch (e) { OS.chat.sessionSettings = {}; } };
 OS.chat.saveSessionSettings = async function() { if (!OS.chat.currentId) return; const s = aiSet(); try { await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system_prompt: s.systemPrompt, stream: s.streaming, use_memory: s.memory, auto_compress: s.autoCompress }) }); } catch (e) {} };
-OS.chat.newChat = async function() { try { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions.unshift(c); OS.chat.currentId = c.id; OS.chat.messages = []; OS.chat.attachments = []; OS.chat.renderAll(); } catch (e) { toast('新建会话失败：' + e.message, true); } };
-OS.chat.switch = async function(id) { if (Date.now() - _chatLongPress < 600) return; OS.chat.currentId = id; OS.chat.attachments = []; OS.chat.renderSessions(); const el = document.getElementById('chatMsgs'); if (el) el.innerHTML = '<div class="muted" style="margin:auto">加载中…</div>'; try { await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } catch (e) { OS.chat.messages = [{ role: 'assistant', content: '加载失败：' + e.message, error: true }]; } OS.chat.renderAll(); };
-OS.chat.changeModel = function() { aiSet().model = document.getElementById('chatModel').value; saveDB(); };
+OS.chat.newChat = async function() { try { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions.unshift(c); OS.chat.currentId = c.id; OS.chat.messages = []; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderAll(); } catch (e) { toast('新建会话失败：' + e.message, true); } };
+OS.chat.switch = async function(id) { if (Date.now() - _chatLongPress < 600) return; OS.chat.currentId = id; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderSessions(); const el = document.getElementById('chatMsgs'); if (el) el.innerHTML = '<div class="muted" style="margin:auto">加载中…</div>'; try { await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } catch (e) { OS.chat.messages = [{ role: 'assistant', content: '加载失败：' + e.message, error: true }]; } OS.chat.renderAll(); };
+OS.chat.setModel = function(v) { aiSet().model = v; saveDB(); toast('已切换模型'); };
 OS.chat.sessionMenu = function(e, id) {
   const sid = id || OS.chat.currentId;
   const items = [ { label: '重命名', ico: '✎', fn: 'OS.closeMenu();OS.chat.renameSession(\'' + sid + '\')' }, { label: '置顶 / 取消置顶', ico: '📌', fn: 'OS.closeMenu();OS.chat.togglePinSession(\'' + sid + '\')' }, { label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();OS.chat.deleteSession(\'' + sid + '\')' } ];
+  menu(items, e.clientX, e.clientY);
+};
+// 顶栏 ⋯：模型选择 + 当前会话操作（需求 6：模型选择从顶栏移入菜单）
+OS.chat.topMenu = function(e) {
+  const s = aiSet();
+  const items = MODELS.map(([v, label]) => ({ label: (v === s.model ? '✓ ' : '') + label, ico: '🤖', fn: 'OS.closeMenu();OS.chat.setModel(\'' + v + '\')' }));
+  items.push({ label: '重命名', ico: '✎', fn: 'OS.closeMenu();OS.chat.renameSession(\'' + OS.chat.currentId + '\')' });
+  items.push({ label: '置顶 / 取消置顶', ico: '📌', fn: 'OS.closeMenu();OS.chat.togglePinSession(\'' + OS.chat.currentId + '\')' });
+  items.push({ label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();OS.chat.deleteSession(\'' + OS.chat.currentId + '\')' });
   menu(items, e.clientX, e.clientY);
 };
 OS.chat.renameSession = function(id) { const s = OS.chat.sessions.find((x) => x.id === id); if (!s) return; modal('<div class="modal-head"><h3>重命名会话</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><input class="input" id="csName" value="' + esc(s.name) + '"></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="OS.chat.doRename(\'' + id + '\')">保存</button></div>'); };
@@ -2963,6 +3023,62 @@ OS.chat.sendStreaming = async function(content, thinking, now, quoted) {
   apply(full);
 };
 OS.chat.copyMsg = async function(btn, id) { const m = OS.chat.messages.find((x) => x.id === id); if (!m) return; try { await navigator.clipboard.writeText(m.content); } catch (e) { const ta = document.createElement('textarea'); ta.value = m.content; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove(); } btn.textContent = '已复制'; setTimeout(() => { btn.textContent = '复制'; }, 1500); };
+OS.chat.copyMsgById = async function(id) {
+  const m = OS.chat.messages.find((x) => x.id === id); if (!m) return;
+  try { await navigator.clipboard.writeText(m.content); } catch (e) { const ta = document.createElement('textarea'); ta.value = m.content; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove(); }
+  toast('已复制');
+};
+OS.chat.saveAsNote = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) saveAsNote(m.content); };
+OS.chat.createTask = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) createTaskFromContent(m.content.slice(0, 80)); };
+// 需求 5：点击气泡 → 轻量操作菜单；点其他气泡/空白自动关闭（复用全局 menu() 的点击外关闭）
+OS.chat.bubbleMenu = function(e, id) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  const m = OS.chat.messages.find((x) => x.id === id);
+  if (!m || !m.content) return;
+  const items = [];
+  if (m.role === 'user') {
+    items.push({ label: '编辑', ico: '✎', fn: 'OS.closeMenu();OS.chat.editMessage(\'' + id + '\')' });
+    items.push({ label: '复制', ico: '⧉', fn: 'OS.closeMenu();OS.chat.copyMsgById(\'' + id + '\')' });
+    items.push({ label: '重新生成', ico: '↻', fn: 'OS.closeMenu();OS.chat.regenerateFrom(\'' + id + '\')' });
+  } else {
+    items.push({ label: '复制', ico: '⧉', fn: 'OS.closeMenu();OS.chat.copyMsgById(\'' + id + '\')' });
+    let lastAi = -1; for (let i = OS.chat.messages.length - 1; i >= 0; i--) if (OS.chat.messages[i].role === 'assistant') { lastAi = i; break; }
+    if (OS.chat.messages[lastAi] === m) items.push({ label: '重新输出', ico: '↻', fn: 'OS.closeMenu();OS.chat.regenerate()' });
+    items.push({ label: '存为笔记', ico: '✎', fn: 'OS.closeMenu();OS.chat.saveAsNote(\'' + id + '\')' });
+    items.push({ label: '生成任务', ico: '✓', fn: 'OS.closeMenu();OS.chat.createTask(\'' + id + '\')' });
+  }
+  menu(items, e.clientX, e.clientY);
+};
+// 需求 4B：编辑单条用户消息，改后重新发送，不产生重复消息
+OS.chat.editMessage = function(id) {
+  const m = OS.chat.messages.find((x) => x.id === id);
+  if (!m || m.role !== 'user') return;
+  modal('<div class="modal-head"><h3>编辑消息</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><textarea class="textarea" id="emContent" style="min-height:120px">' + esc(m.content) + '</textarea></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="OS.chat.doEdit(\'' + id + '\')">重新发送</button></div>');
+};
+OS.chat.doEdit = function(id) {
+  const el = document.getElementById('emContent'); const v = el ? el.value.trim() : '';
+  closeModal();
+  if (!v) return;
+  OS.chat.resend(id, v);
+};
+OS.chat.regenerateFrom = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) OS.chat.resend(id, m.content); };
+OS.chat.resend = async function(id, content) {
+  const v = String(content || '').trim(); if (!v) return;
+  const idx = OS.chat.messages.findIndex((x) => x.id === id);
+  const thinking = { role: 'assistant', content: '', time: new Date().toLocaleString(), thinking: true };
+  if (idx >= 0) { OS.chat.messages[idx].content = v; OS.chat.messages = OS.chat.messages.slice(0, idx + 1).concat([thinking]); }
+  OS.chat.renderAll();
+  try {
+    const resp = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages/' + id + '/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: v, model: aiSet().model }) });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+    OS.chat.messages = (data.messages || []).map(chatMapMessage);
+  } catch (err) {
+    OS.chat.messages = OS.chat.messages.filter((m) => m !== thinking);
+    OS.chat.messages.push({ role: 'assistant', content: '❌ 操作失败：' + err.message, error: true });
+  }
+  OS.chat.renderAll();
+};
 OS.chat.regenerate = async function() {
   let idx = -1; for (let i = OS.chat.messages.length - 1; i >= 0; i--) if (OS.chat.messages[i].role === 'assistant') { idx = i; break; }
   if (idx < 0) return;
@@ -2976,11 +3092,16 @@ function createTaskFromAi() {
   openTaskModal(null, null, null);
   setTimeout(() => { const el = document.getElementById('tkTitle'); if (el) el.value = content; }, 80);
 }
+function createTaskFromContent(content) {
+  openTaskModal(null, null, null);
+  setTimeout(() => { const el = document.getElementById('tkTitle'); if (el) el.value = (content || ''); }, 80);
+}
 async function checkProactive() { try { const r = await fetch(API_BASE + '/api/proactive'); if (!r.ok) return; const data = await r.json(); if (data.sent) pushNotification('ai', aiSet().aiName || 'AI', (data.message && data.message.content) || '来了一条主动消息'); } catch (e) {} }
 
 /* ================= INIT ================= */
 function init() {
   applyTheme(); render();
+  bindEdgeSwipe();
   window.addEventListener('hashchange', () => { OS.route = parseHash(); render(); AIBus.emit({ type: 'PAGE_CHANGED', entityType: 'page', payload: { route: OS.route } }); });
   setTimeout(() => { const sp = document.getElementById('splash'); if (sp) { sp.classList.add('fade-out'); setTimeout(() => sp.remove(), 700); } }, 2500);
   checkProactive();
@@ -3327,7 +3448,7 @@ function addShoppingItem(listId, title, opts) {
   opts = opts || {};
   const it = { id: uid(), listId, title: String(title).trim(), note: opts.note || '', category: opts.category || '其他', priority: opts.priority || 'normal', completed: false, sourceMemoryId: opts.sourceMemoryId || null, sourceConversationId: opts.sourceConversationId || null, createdAt: Date.now(), updatedAt: Date.now() };
   DB.shoppingItems.push(it); saveDB();
-  aiLogActivity('shopping', (listId === 'deity' ? '祂建议：' : '加入：') + it.title);
+  AIBus.emit({ type: 'SHOPPING_ITEM_CREATED', entityType: 'shoppingItem', entityId: it.id, payload: it });
   return it;
 }
 function toggleShoppingItem(id) {
@@ -3335,7 +3456,7 @@ function toggleShoppingItem(id) {
   it.completed = !it.completed; it.updatedAt = Date.now(); saveDB(); render();
   if (it.completed) AIBus.emit({ type: 'SHOPPING_ITEM_COMPLETED', entityType: 'shoppingItem', entityId: id, payload: it });
 }
-function deleteShoppingItem(id) { DB.shoppingItems = DB.shoppingItems.filter((x) => x.id !== id); saveDB(); render(); }
+function deleteShoppingItem(id) { const it = (DB.shoppingItems || []).find((x) => x.id === id); DB.shoppingItems = DB.shoppingItems.filter((x) => x.id !== id); saveDB(); render(); if (it) AIBus.emit({ type: 'SHOPPING_ITEM_DELETED', entityType: 'shoppingItem', entityId: id, payload: it }); }
 function editShoppingItem(id) { const it = (DB.shoppingItems || []).find((x) => x.id === id); if (it) shoppingItemModal(it); }
 function shoppingItemModal(it) {
   const editing = !!it;
@@ -3352,10 +3473,11 @@ function saveShoppingItem() {
   const title = document.getElementById('siTitle').value.trim();
   if (!title) { toast('名称不能为空', true); return; }
   const data = { title, note: document.getElementById('siNote').value.trim(), category: document.getElementById('siCat').value.trim() || '其他', priority: document.getElementById('siPrio').value, updatedAt: Date.now() };
-  if (id) Object.assign((DB.shoppingItems || []).find((x) => x.id === id), data);
-  else addShoppingItem(document.getElementById('siList').value || 'mine', title, data);
+  let saved;
+  if (id) { saved = (DB.shoppingItems || []).find((x) => x.id === id); if (saved) Object.assign(saved, data); }
+  else saved = addShoppingItem(document.getElementById('siList').value || 'mine', title, data);
   saveDB(); closeModal(); render(); toast('已保存 ✓');
-  AIBus.emit({ type: 'SHOPPING_ITEM_UPDATED', entityType: 'shoppingItem', entityId: id });
+  if (id) AIBus.emit({ type: 'SHOPPING_ITEM_UPDATED', entityType: 'shoppingItem', entityId: id, payload: saved });
 }
 function setShopList(id) { _shopList = id; render(); }
 function shopItemHtml(it) {
@@ -3690,28 +3812,59 @@ function aiRejectUmbrella() {
   aiSetState('委屈', 1, '我记了一周的雨伞，但你刚刚说不需要了。不是生气，只是想帮你却没帮上。', 'weather', 'shopping', null, null);
   toast('好的，那这次先不带。');
 }
-/* ---- 事件规则引擎 ---- */
+/* ---- 事件规则引擎（去硬编码：回应文案交给后端 /api/ai/respond，AI 自行决定） ---- */
+function emitAIEvent(o) {
+  AIBus.emit({
+    type: o.type, action: o.action || null,
+    entityType: o.entity || o.entityType, entityId: o.entityId || null,
+    payload: o.data || o.payload, time: o.timestamp || Date.now(),
+  });
+}
+function aiMapEmotion(raw) {
+  const e = String(raw || '').trim();
+  if (!e) return '';
+  if (AI_EMOTIONS.includes(e)) return e;
+  const map = { 开心: ['开心', '高兴', '喜'], 委屈: ['委屈'], 担心: ['担心', '焦虑', '怕', '紧张'], 安心: ['安心', '踏实', '平静', '放松'], 期待: ['期待', '盼望'], 失落: ['失落', '难过', '遗憾', '沮丧'], 满足: ['满足', '欣慰'], 想帮忙: ['帮忙', '帮'], 有点困惑: ['困惑', '疑惑', '不懂'], 认真: ['认真', '专注'], 在意: ['在意', '关心', '挂念', '惦记'] };
+  for (const [k, kws] of Object.entries(map)) if (kws.some((w) => e.includes(w))) return k;
+  return '';
+}
+let _respondQueue = [];
+let _respondTimer = null;
+function aiRespondAsync(ev) {
+  _respondQueue.push(ev);
+  if (_respondTimer) return;
+  _respondTimer = setTimeout(async () => {
+    _respondTimer = null;
+    if (!aiThrottleOk(30000)) { _respondQueue = []; return; }
+    const batch = _respondQueue.splice(0, 8);
+    try {
+      const resp = await fetch(API_BASE + '/api/ai/respond', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ events: batch.map((e) => ({ type: e.type, entityType: e.entityType, entityId: e.entityId, payload: e.payload })) }) });
+      const data = await resp.json().catch(() => ({}));
+      if (!data || !data.respond || !data.message) return;
+      const emotion = aiMapEmotion(data.emotion);
+      if (emotion) aiSetState(emotion, data.intensity || 1, data.message, 'event', batch[batch.length - 1]?.entityType || 'page', batch[batch.length - 1]?.entityId || null, null);
+      AINotify.send('INFO', aiSet().aiName || '♥ 我的AI', data.message, null, { render: false });
+    } catch (e) { /* 后端不可达 / 缺 Key：静默降级，绝不用假文案冒充 */ }
+  }, 1200);
+}
 function aiOnEvent(ev) {
   try {
     if (ev.type === 'PAGE_CHANGED') return;
     if (!aiCan('pageContext')) return;
-    const ctx = buildAIContext();
 
+    // 日志：提取长期记忆（保留原有能力）
     if (ev.type === 'JOURNAL_CREATED') {
       if (!aiCan('journal')) return;
       const e = ev.payload || {};
       aiLogActivity('journal', '写下日志：' + (e.content || '').slice(0, 24) + ((e.content || '').length > 24 ? '…' : ''));
       aiConsiderMemory(e.content, '偏好', 'journal', ev.entityId);
-      const r = AIResponseComposer.generate(ev, ctx);
-      if (r && r.shouldRespond) { if (r.state) aiSetState(r.state.emotion, r.state.intensity, r.state.reason, 'journal', 'journal', ev.entityId, null); AINotify.send('INFO', '关于你的日志', r.message, [{ key: 'open_journal', label: '看看' }], { render: false }); }
+      aiRespondAsync(ev);
       return;
     }
-    if (ev.type === 'JOURNAL_UPDATED') { aiLogActivity('journal', '更新了一条日志'); return; }
-    if (ev.type === 'JOURNAL_DELETED') { return; }
+    if (ev.type === 'JOURNAL_UPDATED' || ev.type === 'JOURNAL_DELETED') return;
 
-    if (ev.type === 'MUSIC_PLAY' || ev.type === 'MUSIC_CHANGED') {
-      // 需求 19：绝不自动写“你正在听 XXX”这类流水动态。
-      // 只在「长期收听模式」有价值时写一条：同一首歌累积播放达阈值才记录一次，且只记一次。
+    // 音乐：绝不写“正在听 XXX”流水动态；仅长期收听模式记一次
+    if (ev.type === 'MUSIC_PLAY' || ev.type === 'MUSIC_CHANGED' || ev.type === 'MUSIC_PAUSE') {
       const t = currentTrack();
       if (t && (t.playCount || 0) >= 5 && !t.patternLogged) {
         t.patternLogged = true; saveDB();
@@ -3719,21 +3872,25 @@ function aiOnEvent(ev) {
       }
       return;
     }
-    if (ev.type === 'TASK_COMPLETED') { aiLogActivity('task', '完成：' + (ev.payload ? ev.payload.title : '')); const r = AIResponseComposer.generate(ev, ctx); if (r && r.shouldRespond && r.state) aiSetState(r.state.emotion, r.state.intensity, r.state.reason, 'task', 'task', ev.entityId, null); return; }
-    if (ev.type === 'TASK_CREATED') { aiLogActivity('task', '创建：' + (ev.payload ? ev.payload.title : '')); return; }
-    if (ev.type === 'TASK_DELETED') { return; }
-    if (ev.type === 'TASK_UPDATED') { return; }
-    if (ev.type === 'HABIT_COMPLETED') { aiLogActivity('habit', '打卡：' + (ev.payload ? ev.payload.name : '')); const r = AIResponseComposer.generate(ev, ctx); if (r && r.shouldRespond && r.state) aiSetState(r.state.emotion, r.state.intensity, r.state.reason, 'habit', 'habit', ev.entityId, null); return; }
-    if (ev.type === 'HABIT_UPDATED') { return; }
-    if (ev.type === 'PLAN_CREATED') { aiLogActivity('plan', '新建计划：' + (ev.payload ? ev.payload.title : '')); return; }
-    if (ev.type === 'PLAN_DELETED') { aiLogActivity('plan', '删除计划：' + (ev.payload ? ev.payload.title : '')); return; }
-    if (ev.type === 'PLAN_UPDATED') { return; }
-    if (ev.type === 'CALENDAR_EVENT_CREATED') { aiLogActivity('task', '新增日程：' + (ev.payload ? ev.payload.title : '')); return; }
-    if (ev.type === 'LOCATION_CHANGED') { aiLogActivity('location', '定位到：' + (ev.payload ? ev.payload.city : '')); const r = AIResponseComposer.generate(ev, ctx); if (r && r.shouldRespond) AINotify.send('INFO', '定位成功', r.message, null, { render: true }); return; }
+
     if (ev.type === 'WEATHER_UPDATED') { if (ev.payload && ev.payload.code === 'rain') aiOnWeatherRain(ev.payload); return; }
-    if (ev.type === 'SHOPPING_ITEM_COMPLETED') { aiLogActivity('shopping', '完成购买：' + (ev.payload ? ev.payload.title : '')); return; }
-    if (ev.type === 'SHOPPING_ITEM_UPDATED') { aiLogActivity('shopping', '更新清单'); return; }
-    if (ev.type === 'MEMORY_CREATED' || ev.type === 'AI_STATE_CHANGED') { return; }
+
+    // 有意义的业务操作：记一条精炼动态 + 交给 AI 决定是否动态回应（文案由模型生成，非硬编码）
+    const valuable = {
+      TASK_COMPLETED: ['task', '完成：', 'title'], TASK_CREATED: ['task', '创建：', 'title'],
+      HABIT_COMPLETED: ['habit', '打卡：', 'name'], HABIT_CREATED: ['habit', '新习惯：', 'name'],
+      PLAN_CREATED: ['plan', '新建计划：', 'title'], PLAN_DELETED: ['plan', '删除计划：', 'title'],
+      CALENDAR_EVENT_CREATED: ['task', '新增日程：', 'title'],
+      SHOPPING_ITEM_COMPLETED: ['shopping', '完成购买：', 'title'],
+      LOCATION_CHANGED: ['location', '定位到：', 'city'],
+    };
+    if (valuable[ev.type]) {
+      const [iconType, prefix, field] = valuable[ev.type];
+      const v = (ev.payload && ev.payload[field]) || '';
+      if (v) aiLogActivity(iconType, prefix + v);
+      aiRespondAsync(ev);
+      return;
+    }
   } catch (e) { console.warn('[aiOnEvent]', e); }
 }
 

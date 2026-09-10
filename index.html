@@ -2,8 +2,19 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Bunny's Home</title>
+  <meta name="description" content="Bunny's Home — 属于 Bunny & Elliott 的个人 AI 生活操作系统（任务 / 习惯 / 计划 / 记账 / 健康 / AI 陪伴）">
+  <meta name="theme-color" content="#6b8cae">
+  <!-- PWA：可安装到 iPhone / Android 主屏幕 -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <!-- iOS 独立窗口（添加到主屏幕后以 App 形态打开，不显示 Safari 地址栏） -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bunny's Home">
   <link rel="stylesheet" href="fonts/fonts.css">
   <style>
     @font-face {
@@ -86,7 +97,7 @@
     .sidebar {
       width: var(--sidebar-w); height: 100vh; flex-shrink: 0;
       background: var(--accent-bg); border-right: 1px solid var(--accent-line);
-      display: flex; flex-direction: column; padding: 18px 12px 12px;
+      display: flex; flex-direction: column; padding: calc(18px + env(safe-area-inset-top)) 12px 12px;
       position: relative; z-index: 90;
     }
     .logo {
@@ -122,8 +133,8 @@
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; position: relative; }
     .main .bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 1; pointer-events: none; z-index: 0; transition: opacity 0.3s; }
     .topbar {
-      height: var(--topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 12px;
-      padding: 0 18px; position: relative; z-index: 2;
+      height: calc(var(--topbar-h) + env(safe-area-inset-top)); flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+      padding: env(safe-area-inset-top) 18px 0; position: relative; z-index: 2;
       background: rgba(255,255,255,0.55); backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--border);
     }
@@ -150,7 +161,8 @@
 
     /* ============ Bottom nav / FAB ============ */
     .bottomnav {
-      display: none; position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottomnav-h);
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom));
       background: var(--card); backdrop-filter: blur(14px); border-top: 1px solid var(--border);
       z-index: 70; padding-bottom: env(safe-area-inset-bottom);
     }
@@ -442,7 +454,7 @@
       .bottomnav { display: block; }
       .fab { bottom: 76px; }
       .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
-      .view { padding: 16px 14px 110px; }
+      .view { padding: 16px 14px calc(110px + env(safe-area-inset-bottom)); }
       .week-grid { overflow-x: auto; grid-template-columns: repeat(7, minmax(150px, 1fr)); }
       .cal-cell { min-height: 60px; }
       .cal-dot { display: none; }
@@ -485,7 +497,13 @@
    Bunny's Home — Personal AI Life OS  (single-file, vanilla JS)
    Hash router + localStorage persistence + optional backend for AI chat.
    ========================================================================= */
-const API_BASE = '';
+// 后端地址自适应：同源部署（Render / 本地调试）走相对路径；否则（如 Vercel 托管前端）走绝对地址。
+// 修复：曾固定为绝对地址，后改成 '' 导致 Vercel 上请求同源 /api/* 返回 HTML，登录/同步全部失效。
+const API_BASE = (() => {
+  const h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1' || h.endsWith('.onrender.com')) return '';
+  return 'https://bunny-backend-bv89.onrender.com';
+})();
 const LS_KEY = 'bunny_os_v1';
 
 /* ---------------- utils ---------------- */
@@ -566,6 +584,8 @@ const TYPE_META = {
   'weekly':    { label: '周计划', sub: '周计划', def: null, color: '#f97316', ico: '🗓' },
 };
 const PLANS_META = { 'long-term': '长期计划', 'stage': '阶段计划', 'monthly': '月度计划', 'weekly': '周计划' };
+// 需求 19：计划展示顺序固定为 周 → 月 → 阶段 → 长期
+const PLAN_ORDER = ['weekly', 'monthly', 'stage', 'long-term'];
 
 function defaultDB() {
   const now = new Date();
@@ -588,11 +608,8 @@ function defaultDB() {
     { name: 'Meditation', icon: '🧘', color: '#f59e0b', frequency: 'daily', goal: 1, reminderTime: '08:00', completions: [] },
     { name: 'Sleep Early', icon: '🌙', color: '#6366f1', frequency: 'daily', goal: 1, reminderTime: '22:30', completions: [] },
   ].map((h) => ({ id: uid(), streak: 0, completions: [], createdAt: Date.now(), ...h }));
+  // 健康记录按天真实录入，不再播种随机假数据（需求 29：无 mock/随机数据）
   const health = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = addDays(todayStr(), -i);
-    health.push({ id: uid(), date: d, sleep: +(6.5 + Math.random() * 2).toFixed(1), steps: 5000 + Math.floor(Math.random() * 7000), heartRate: 62 + Math.floor(Math.random() * 14), calories: 300 + Math.floor(Math.random() * 300), water: +(1 + Math.random() * 1.5).toFixed(1) });
-  }
   return {
     version: 1,
     ai: {
@@ -615,6 +632,14 @@ function defaultDB() {
     plans: [ longTerm, stage ],
     habits,
     health,
+    healthProfile: { height: null },
+    // 财务：金额一律整数分（amountCents），货币 CNY
+    expenses: [],
+    purchases: [],
+    budget: { monthlyCents: null, currency: 'CNY' },
+    // 健康隐私
+    menstrualCycles: [],
+    medicalRecords: [],
     notes: [ { id: uid(), title: '欢迎使用 Bunny\'s Home', content: '这是一个属于你的个人数字空间。\n\n· 点击右下角 + 快速创建任务 / 计划 / 习惯\n· 我的AI 可以帮你安排今天\n· 所有数据都保存在本地', tags: ['欢迎'], pinned: true, createdAt: Date.now(), updatedAt: Date.now() } ],
     player: { playlist: [ { title: 'Turning Page', artist: 'Sleeping At Last', cover: '', duration: 255 } ], current: 0, playing: false, currentTime: 0, volume: 0.8, togetherListening: false },
     notifications: [
@@ -655,6 +680,19 @@ function loadDB() {
   if (!Array.isArray(db.shoppingLists)) db.shoppingLists = def.shoppingLists;
   if (!Array.isArray(db.shoppingItems)) db.shoppingItems = [];
   if (!Array.isArray(db.journal)) db.journal = [];
+  if (!Array.isArray(db.expenses)) db.expenses = [];
+  if (!Array.isArray(db.purchases)) db.purchases = [];
+  if (!db.budget) db.budget = def.budget;
+  if (!Array.isArray(db.menstrualCycles)) db.menstrualCycles = [];
+  if (!Array.isArray(db.medicalRecords)) db.medicalRecords = [];
+  if (!db.healthProfile) db.healthProfile = def.healthProfile;
+  // 老数据清洗：健康记录里的 steps/heartRate/calories 字段（旧模型）一并剔除
+  for (const rec of db.health) {
+    delete rec.steps; delete rec.heartRate; delete rec.calories;
+    if (rec.caloriesIn == null) rec.caloriesIn = 0;
+    if (rec.caloriesOut == null) rec.caloriesOut = 0;
+    if (rec.weight == null) rec.weight = null;
+  }
   // ensure each plan type has >= 1 plan
   for (const t of Object.keys(TYPE_META)) {
     const arr = db.plans.filter((p) => p.type === t);
@@ -770,7 +808,7 @@ function closeMenu() { document.getElementById('menuRoot').innerHTML = ''; }
 const ROUTES = {
   '/today': 'Home', '/calendar': '日历', '/alarm': '闹钟', '/plans': '计划',
   '/plans/long-term': '长期计划', '/plans/stage': '阶段计划', '/plans/monthly': '月度计划', '/plans/weekly': '周计划',
-  '/habit': '习惯', '/health': '健康', '/statistics': '统计',
+  '/habit': '习惯', '/health': '健康', '/statistics': '统计', '/finance': '记账', '/period': '经期',
   '/chat': '我的AI · 对话', '/player': '音乐',
   '/shopping': '购物清单', '/ai/memory': 'AI 记忆', '/ai/activity': 'AI 动态', '/journal': '我的日志',
   '/notes': '笔记', '/notifications': '通知', '/profile': '我的主页', '/search': '搜索',
@@ -809,8 +847,8 @@ function navGroups() {
   return [
     { title: 'TODAY', items: [ n('/today', '🏠', 'Home'), n('/calendar', '📅', 'Calendar'), n('/alarm', '⏰', '闹钟') ] },
     { title: '♥ 我的AI', ai: true, items: [ n('/chat', '💬', 'AI Chat'), n('/ai/memory', '🧠', 'AI Memory'), n('/ai/activity', '💗', 'AI Activity') ] },
-    { title: 'PLANS', items: [ n('/plans/long-term', '🎯', 'Long-term'), n('/plans/stage', '🧭', 'Stage'), n('/plans/monthly', '📆', 'Monthly'), n('/plans/weekly', '🗓', 'Weekly') ] },
-    { title: 'LIFE', items: [ n('/habit', '🌱', 'Habit'), n('/health', '❤️', 'Health'), n('/statistics', '📊', 'Statistics'), n('/shopping', '🛒', 'Shopping'), n('/player', '🎵', 'Music') ] },
+    { title: 'PLANS', items: PLAN_ORDER.map((t) => n('/plans/' + t, TYPE_META[t].ico, TYPE_META[t].label)) },
+    { title: 'LIFE', items: [ n('/habit', '🌱', 'Habit'), n('/health', '❤️', 'Health'), n('/statistics', '📊', 'Statistics'), n('/shopping', '🛒', 'Shopping'), n('/finance', '💰', '记账'), n('/player', '🎵', 'Music') ] },
   ];
 }
 function renderSidebar() {
@@ -838,7 +876,6 @@ function renderSidebar() {
   html += '</div>';
   html += '<div class="nav-foot">';
   html += '<button class="nav-item' + (OS.route === '/profile' ? ' active' : '') + '" onclick="OS.toggleSidebar(false);OS.go(\'/profile\')"><span class="ico">👤</span><span class="lbl">Profile</span></button>';
-  html += '<button class="nav-item' + (OS.route === '/journal' ? ' active' : '') + '" style="padding-left:36px" onclick="OS.toggleSidebar(false);OS.go(\'/journal\')"><span class="ico">📖</span><span class="lbl">我的日志</span></button>';
   html += '<button class="nav-item' + (OS.route.startsWith('/settings') ? ' active' : '') + '" onclick="OS.toggleSidebar(false);OS.go(\'/settings\')"><span class="ico">⚙️</span><span class="lbl">Settings</span></button>';
   html += '<button class="nav-item" onclick="OS.toggleSidebar(false);OS.go(\'/notifications\')"><span class="ico">🔔</span><span class="lbl">Notifications</span>' + (unread ? '<span class="badge">' + unread + '</span>' : '') + '</button>';
   html += '</div>';
@@ -864,8 +901,9 @@ function renderTopbar() {
 }
 function renderBottomnav() {
   const el = document.getElementById('bottomnav');
-  const mk = (route, ico, label) => '<button class="bn-item' + (OS.route === route || (route === '/plans' && OS.route.startsWith('/plans/')) ? ' active' : '') + '" onclick="OS.go(\'' + route + '\')"><span class="ico">' + ico + '</span>' + label + '</button>';
-  el.innerHTML = '<div class="bottomnav-inner">' + mk('/today', '🏠', 'Home') + mk('/plans/monthly', '📆', 'Plans') + mk('/habit', '🌱', 'Habit') + mk('/health', '❤️', 'Health') + '<button class="bn-item" onclick="openMoreNav()"><span class="ico">⋯</span>More</button>' + '</div>';
+  const mk = (route, ico, label) => '<button class="bn-item' + (OS.route === route ? ' active' : '') + '" onclick="OS.go(\'' + route + '\')"><span class="ico">' + ico + '</span>' + label + '</button>';
+  // 需求 6：移动端底部导航只保留 Task | Habit | Profile
+  el.innerHTML = '<div class="bottomnav-inner">' + mk('/today', '✅', 'Task') + mk('/habit', '🌱', 'Habit') + mk('/profile', '👤', 'Profile') + '</div>';
 }
 
 /* ---------------- quick create ---------------- */
@@ -911,6 +949,8 @@ function render() {
     else if (r.startsWith('/plans/')) html += viewPlanType(r.split('/')[2]);
     else if (r === '/habit') html += viewHabit();
     else if (r === '/health') html += viewHealth();
+    else if (r === '/finance') html += viewFinance();
+    else if (r === '/period') html += viewPeriod();
     else if (r === '/statistics') html += viewStatistics();
     else if (r === '/shopping') html += viewShopping();
     else if (r === '/ai/memory') html += viewAIMemory();
@@ -965,7 +1005,8 @@ function taskRowHtml(t, opts) {
   const time = t.time ? '<span class="chip">🕒 ' + esc(t.time) + '</span>' : '';
   const chain = taskPlanChain(t).map((c) => '<span class="chip" title="' + esc(c.label + '：' + c.title) + '">' + c.label + '</span>').join('');
   const note = t.note ? ' <span title="' + esc(t.note) + '">📝</span>' : '';
-  return '<div class="task-row' + (t.completed ? ' done' : '') + '" draggable="true" ondragstart="taskDragStart(event,\'' + t.id + '\')" ondragover="event.preventDefault()" ondrop="taskDropOn(event,\'' + t.id + '\')" onclick="openTaskModal(null,\'' + t.id + '\')">' +
+  // 整行：点击/长按/右键均进入编辑（复用 openTaskModal，不新建）；复选框=完成切换，⋯=菜单
+  return '<div class="task-row' + (t.completed ? ' done' : '') + '" draggable="true" ondragstart="taskDragStart(event,\'' + t.id + '\')" ondragover="event.preventDefault()" ondrop="taskDropOn(event,\'' + t.id + '\')" onclick="taskRowClick(event,\'' + t.id + '\')" oncontextmenu="event.preventDefault();openTaskModal(null,\'' + t.id + '\')" ontouchstart="taskPressStart(event,\'' + t.id + '\')" ontouchmove="taskPressMove()" ontouchend="taskPressEnd()" ontouchcancel="taskPressEnd()">' +
     '<span class="chk' + (t.completed ? ' on' : '') + '" onclick="event.stopPropagation();toggleTask(\'' + t.id + '\')"></span>' +
     '<span class="prio ' + (t.priority || 'none') + '" style="background:' + p.color + '"></span>' +
     '<div class="grow"><div class="t-title">' + esc(t.title) + note + '</div><div class="t-meta">' + time + tags + chain + '</div></div>' +
@@ -1007,6 +1048,23 @@ function taskDropToDate(e, date) {
   const id = e.dataTransfer.getData('text/plain');
   const t = taskById(id); if (!t) return;
   t.date = date; saveDB(); render(); toast('已移动到 ' + fmtDateHuman(date));
+}
+
+/* 移动端长按整行进入编辑（600ms；滑动/拖拽则取消） */
+let _taskPress = { id: null, timer: null, moved: false, suppressClick: false };
+function taskPressStart(e, id) {
+  _taskPress.id = id; _taskPress.moved = false; _taskPress.suppressClick = false;
+  clearTimeout(_taskPress.timer);
+  _taskPress.timer = setTimeout(() => {
+    if (!_taskPress.moved && _taskPress.id === id) { _taskPress.suppressClick = true; openTaskModal(null, id); _taskPress.id = null; }
+  }, 600);
+}
+function taskPressMove() { _taskPress.moved = true; }
+function taskPressEnd() { clearTimeout(_taskPress.timer); }
+// 长按后释放会伴随一次 click，这里吞掉，避免重复打开编辑框
+function taskRowClick(e, id) {
+  if (_taskPress.suppressClick) { _taskPress.suppressClick = false; return; }
+  openTaskModal(null, id);
 }
 
 /* task modal */
@@ -1069,9 +1127,12 @@ function viewToday() {
     '<div class="spread" style="margin-bottom:10px"><div style="font-size:17px;font-weight:700">Today</div><div class="muted">' + done + ' / ' + todays.length + ' completed</div></div>' +
     '<div class="progress"><span style="width:' + pct + '%"></span></div></div>';
 
-  // Quick actions
-  html += '<div class="grid cols-4" style="margin-bottom:6px">' +
-    qa('✅', 'Task', 'newTaskModal()') + qa('🌱', 'Habit', 'newHabitModal()') + qa('🎯', 'Plan', 'newPlanSheet()') + qa('📝', 'Note', 'newNoteModal()') + '</div>';
+  // 四模块紧凑卡片：两行（Task|Habit，Plan|Note），点击仅跳转、不在首页 CRUD
+  html += '<div class="grid cols-2" style="margin-bottom:6px">' +
+    compactNavCard('✅', 'Task', DB.tasks.filter((x) => !x.completed).length + ' 待办', '/today') +
+    compactNavCard('🌱', 'Habit', DB.habits.filter((h) => isHabitDone(h, todayStr())).length + ' / ' + DB.habits.length, '/habit') +
+    compactNavCard('🎯', 'Plan', DB.plans.filter((x) => !x.archived).length + ' 个', '/plans') +
+    compactNavCard('📝', 'Note', DB.notes.length + ' 篇', '/notes') + '</div>';
 
   // Today tasks
   html += '<div class="section-head"><h2>今日任务</h2><button class="more" onclick="newTaskModal()">＋ 添加</button></div>';
@@ -1092,6 +1153,9 @@ function viewToday() {
 }
 function qa(ico, label, fn) {
   return '<div class="card card-pad" style="text-align:center;cursor:pointer" onclick="' + fn + '"><div style="font-size:24px">' + ico + '</div><div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">' + label + '</div></div>';
+}
+function compactNavCard(ico, label, count, route) {
+  return '<div class="card card-pad" style="text-align:center;cursor:pointer" onclick="OS.go(\'' + route + '\')"><div style="font-size:22px">' + ico + '</div><div style="font-size:13px;font-weight:700;margin-top:2px">' + esc(label) + '</div><div class="muted" style="font-size:11px">' + esc(count) + '</div></div>';
 }
 
 /* ================= CALENDAR ================= */
@@ -1219,8 +1283,8 @@ function planProgress(plan) {
 }
 
 function viewPlansOverview() {
-  let html = '<div class="h1" style="margin-bottom:4px">Plans</div><div class="muted" style="margin-bottom:20px">四种计划体系：长期 · 阶段 · 月度 · 周</div><div class="grid cols-2">';
-  for (const t of Object.keys(TYPE_META)) {
+  let html = '<div class="h1" style="margin-bottom:4px">Plans</div><div class="muted" style="margin-bottom:20px">四种计划体系：周 · 月度 · 阶段 · 长期</div><div class="grid cols-2">';
+  for (const t of PLAN_ORDER) {
     const meta = TYPE_META[t]; const plans = activePlans(t);
     const last = plans[0] ? relTime(plans.reduce((m, p) => Math.max(m, p.updatedAt || 0), 0)) : '—';
     const avg = plans.length ? Math.round(plans.reduce((s, p) => s + planProgress(p), 0) / plans.length) : 0;
@@ -1257,6 +1321,7 @@ function planMenu(e, type, id) {
     { label: p.archived ? '恢复' : '归档', ico: '📦', fn: 'OS.closeMenu();archivePlan(\'' + id + '\')' },
     { label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();removePlan(\'' + id + '\')' },
   ];
+  if (type === 'monthly') items.splice(1, 0, { label: '经期记录', ico: '🌸', fn: 'OS.closeMenu();OS.go(\'/period\')' });
   menu(items, e.clientX, e.clientY);
 }
 function editPlanName(id) {
@@ -1500,21 +1565,29 @@ function habitStreak(h) {
   while (set.has(d)) { streak++; d = addDays(d, -1); }
   return streak;
 }
+// 累计完成次数：只统计「已跨 0 点」的日期（严格早于今天），今天的打卡由今日状态/连续天数体现。
+function habitTotalCompletions(h) {
+  const today = todayStr();
+  return new Set((h.completions || []).filter((d) => d && d < today)).size;
+}
 function toggleHabit(id, date) {
   const h = habitById(id); if (!h) return;
-  if (!h.completions) h.completions = [];
-  const i = h.completions.indexOf(date);
-  if (i >= 0) h.completions.splice(i, 1); else h.completions.push(date);
-  h.streak = habitStreak(h); saveDB(); render();
-  if (i < 0) toast('已打卡 🔥 ' + h.streak + ' 天');
-  AIBus.emit({ type: i < 0 ? 'HABIT_COMPLETED' : 'HABIT_UPDATED', entityType: 'habit', entityId: id, payload: h });
+  if (!Array.isArray(h.completions)) h.completions = [];
+  // 幂等：同一天重复点击/刷新/重进都不再累加，也不删除已有记录
+  if (h.completions.includes(date)) { toast('今日已打卡 ✓'); return; }
+  h.completions.push(date);
+  h.streak = habitStreak(h);
+  saveDB(); render();
+  toast('已打卡 🔥 ' + habitStreak(h) + ' 天');
+  AIBus.emit({ type: 'HABIT_COMPLETED', entityType: 'habit', entityId: id, payload: h });
 }
 function habitRowHtml(h, date) {
   const done = isHabitDone(h, date);
+  const total = habitTotalCompletions(h);
   return '<div class="task-row" onclick="toggleHabit(\'' + h.id + '\',\'' + date + '\')">' +
     '<span class="habit-ico" style="width:36px;height:36px;font-size:18px;background:' + hexToRgba(h.color, 0.15) + '">' + esc(h.icon) + '</span>' +
-    '<div class="grow"><div class="t-title' + (done ? ' done' : '') + '">' + esc(h.name) + '</div><div class="t-meta"><span class="chip" style="font-size:10.5px">' + (FREQ[h.frequency] || h.frequency) + (h.goal ? ' · ' + h.goal : '') + '</span>' + (h.reminderTime ? '<span class="chip" style="font-size:10.5px">⏰ ' + esc(h.reminderTime) + '</span>' : '') + '</div></div>' +
-    '<span class="habit-streak">🔥 ' + habitStreak(h) + ' 天</span>' +
+    '<div class="grow"><div class="t-title' + (done ? ' done' : '') + '">' + esc(h.name) + '</div><div class="t-meta"><span class="chip" style="font-size:10.5px">' + (FREQ[h.frequency] || h.frequency) + (h.goal ? ' · ' + h.goal : '') + '</span>' + (h.reminderTime ? '<span class="chip" style="font-size:10.5px">⏰ ' + esc(h.reminderTime) + '</span>' : '') + (h.description ? '<span class="muted" style="font-size:11px"> · ' + esc(h.description) + '</span>' : '') + '</div></div>' +
+    '<span class="habit-streak">' + total + ' 次 · 🔥 ' + habitStreak(h) + ' 天</span>' +
     '<span class="chk' + (done ? ' on' : '') + '" onclick="event.stopPropagation();toggleHabit(\'' + h.id + '\',\'' + date + '\')"></span>' +
     '<button class="icon-btn" style="border:none;background:none" onclick="event.stopPropagation();habitMenu(event,\'' + h.id + '\')">⋯</button></div>';
 }
@@ -1540,6 +1613,7 @@ function habitModal(id) {
   const freqOpts = Object.keys(FREQ).map((f) => '<option value="' + f + '"' + (h && h.frequency === f ? ' selected' : '') + '>' + FREQ[f] + '</option>').join('');
   modal('<div class="modal-head"><h3>' + (h ? '编辑习惯' : '新建习惯') + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
     '<div class="field"><label>名称</label><input class="input" id="hbName" value="' + esc(h ? h.name : '') + '" placeholder="如：喝水"></div>' +
+    '<div class="field"><label>描述</label><input class="input" id="hbDesc" value="' + esc(h ? (h.description || '') : '') + '" placeholder="选填，如：每天 8 杯水"></div>' +
     '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>图标</label><input class="input" id="hbIcon" value="' + esc(h ? h.icon : '') + '" placeholder="💧"></div><div class="grow"><label>目标次数</label><input class="input" type="number" id="hbGoal" value="' + (h ? (h.goal || '') : '') + '" placeholder="8"></div></div></div>' +
     '<div class="field"><label>颜色</label>' + swatchHtml(h ? h.color : '#6b8cae') + '<input type="hidden" id="swVal" value="' + (h ? h.color : '#6b8cae') + '"></div>' +
     '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>频率</label><select class="select" id="hbFreq">' + freqOpts + '</select></div><div class="grow"><label>提醒时间</label><input class="input" type="time" id="hbTime" value="' + esc(h ? (h.reminderTime || '') : '') + '"></div></div></div>' +
@@ -1547,7 +1621,7 @@ function habitModal(id) {
 }
 function saveHabit(id) {
   const name = document.getElementById('hbName').value.trim(); if (!name) { toast('请输入名称', true); return; }
-  const data = { name, icon: document.getElementById('hbIcon').value.trim() || '⭐', color: document.getElementById('swVal').value, frequency: document.getElementById('hbFreq').value, goal: +document.getElementById('hbGoal').value || null, reminderTime: document.getElementById('hbTime').value };
+  const data = { name, description: document.getElementById('hbDesc').value.trim(), icon: document.getElementById('hbIcon').value.trim() || '⭐', color: document.getElementById('swVal').value, frequency: document.getElementById('hbFreq').value, goal: +document.getElementById('hbGoal').value || null, reminderTime: document.getElementById('hbTime').value };
   if (id) Object.assign(habitById(id), data);
   else DB.habits.push({ id: uid(), streak: 0, completions: [], createdAt: Date.now(), ...data });
   saveDB(); closeModal(); render(); toast('已保存 ✓');
@@ -1556,24 +1630,44 @@ function saveHabit(id) {
 
 /* ================= HEALTH ================= */
 function healthToday() { return DB.health.find((x) => x.date === todayStr()); }
-function healthRange(n) { const out = []; for (let i = n - 1; i >= 0; i--) { const ds = addDays(todayStr(), -i); out.push(DB.health.find((x) => x.date === ds) || { date: ds, sleep: 0, steps: 0, heartRate: 0, calories: 0, water: 0 }); } return out; }
+function healthRecord(date) {
+  let rec = DB.health.find((x) => x.date === date);
+  if (!rec) { rec = { id: uid(), date, sleep: 0, water: 0, caloriesIn: 0, caloriesOut: 0, weight: null }; DB.health.push(rec); }
+  return rec;
+}
+function healthRange(n) { const out = []; for (let i = n - 1; i >= 0; i--) { const ds = addDays(todayStr(), -i); out.push(DB.health.find((x) => x.date === ds) || { date: ds, sleep: 0, water: 0, caloriesIn: 0, caloriesOut: 0, weight: null }); } return out; }
+function parseSleep(s) {
+  const t = String(s || '').trim(); if (!t) return null;
+  let hours = 0, hit = false;
+  const hm = t.match(/(\d+(?:\.\d+)?)\s*h/i); if (hm) { hours += +hm[1]; hit = true; }
+  const mm = t.match(/(\d+)\s*m/i); if (mm) { hours += +mm[1] / 60; hit = true; }
+  if (hit) return Math.round(hours * 100) / 100;
+  const n = Number(t); return Number.isFinite(n) ? n : null;
+}
+function fmtSleep(h) { const v = Number(h) || 0; if (!v) return '—'; const hh = Math.floor(v); const mm = Math.round((v - hh) * 60); return hh + 'h' + (mm ? ' ' + mm + 'm' : ''); }
+function fmtVal(v, unit) { const n = Number(v); return n ? n.toLocaleString() + unit : '—'; }
 function viewHealth() {
-  const t = healthToday() || { sleep: 0, steps: 0, heartRate: 0, calories: 0, water: 0 };
+  const t = healthToday() || { sleep: 0, water: 0, caloriesIn: 0, caloriesOut: 0, weight: null };
+  const hp = DB.healthProfile || {};
   const r = OS.ui.healthRange;
   let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">Health</div><div class="muted">今日健康数据</div></div><button class="btn btn-soft" onclick="editHealthToday()">✎ 记录</button></div>';
-  html += '<div class="grid cols-2" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">' +
-    statCard('😴', 'Sleep', t.sleep + 'h', '睡眠时长') + statCard('👟', 'Steps', t.steps.toLocaleString(), '步数') + statCard('❤️', 'Heart', t.heartRate + ' BPM', '心率') + statCard('🔥', 'Calories', t.calories.toLocaleString(), '千卡') + statCard('💧', 'Water', t.water + ' L', '饮水') + '</div>';
+  // 身高 + 体重（顶部，可编辑）
+  html += '<div class="grid cols-2" style="margin-bottom:16px">' +
+    '<div class="card stat-card" style="cursor:pointer" onclick="editHeight()"><div style="font-size:20px;margin-bottom:6px">📏</div><div class="v">' + (hp.height ? hp.height + ' cm' : '—') + '</div><div class="l">身高</div><div class="u">点击编辑</div></div>' +
+    '<div class="card stat-card" style="cursor:pointer" onclick="openHealthDay(\'' + todayStr() + '\')"><div style="font-size:20px;margin-bottom:6px">⚖️</div><div class="v">' + (t.weight ? t.weight + ' kg' : '—') + '</div><div class="l">体重</div><div class="u">点击记录</div></div>' +
+    '</div>';
+  // 今日四指标
+  html += '<div class="grid cols-2" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">' +
+    statCard('😴', 'Sleep', fmtSleep(t.sleep), '睡眠') + statCard('💧', 'Water', fmtVal(t.water, ' L'), '饮水') + statCard('🍚', 'Calories In', fmtVal(t.caloriesIn, ''), '摄入千卡') + statCard('🏃', 'Calories Out', fmtVal(t.caloriesOut, ''), '消耗千卡') + '</div>';
   html += '<div class="spread" style="margin-bottom:12px"><div class="seg">' + rangeBtn(7, '7 天', r) + rangeBtn(30, '30 天', r) + '</div></div>';
   html += '<div class="grid cols-2" style="margin-bottom:16px">' +
+    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">⚖️ 体重（kg）</div><div id="chWeight"></div></div>' +
+    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">🍚 摄入（千卡）</div><div id="chIn"></div></div>' +
+    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">🏃 消耗（千卡）</div><div id="chOut"></div></div>' +
+    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">💧 饮水（升）</div><div id="chWater"></div></div>' +
     '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">😴 睡眠（小时）</div><div id="chSleep"></div></div>' +
-    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">👟 步数</div><div id="chSteps"></div></div>' +
-    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">❤️ 心率（BPM）</div><div id="chHr"></div></div>' +
-    '<div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">🔥 卡路里</div><div id="chCal"></div></div>' +
     '</div>';
-  html += '<div class="section-head"><h2>最近 7 天</h2></div><div class="card card-pad"><div class="row" style="gap:8px;overflow-x:auto">';
-  for (let i = 6; i >= 0; i--) { const ds = addDays(todayStr(), -i); const rec = DB.health.find((x) => x.date === ds); const d = parseDate(ds);
-    html += '<div style="min-width:64px;text-align:center;padding:10px;border-radius:12px;cursor:pointer;' + (ds === todayStr() ? 'background:var(--accent-tint)' : '') + '" onclick="openHealthDay(\'' + ds + '\')"><div class="muted" style="font-size:11px">' + (d.getMonth() + 1) + '/' + d.getDate() + '</div><div style="font-size:15px;font-weight:700;margin:4px 0">' + (rec ? rec.sleep + 'h' : '—') + '</div><div class="muted" style="font-size:10px">👟 ' + (rec ? (rec.steps / 1000).toFixed(1) + 'k' : '—') + '</div></div>'; }
-  html += '</div></div>';
+  html += medicalRecordsSection();
   return html;
 }
 function statCard(ico, label, v, u) { return '<div class="card stat-card"><div style="font-size:20px;margin-bottom:6px">' + ico + '</div><div class="v">' + v + '</div><div class="l">' + label + '</div><div class="u">' + u + '</div></div>'; }
@@ -1581,27 +1675,100 @@ function rangeBtn(n, label, cur) { return '<button class="' + (cur === n ? 'on' 
 function setHealthRange(n) { OS.ui.healthRange = n; render(); }
 function editHealthToday() { openHealthDay(todayStr()); }
 function openHealthDay(date) {
-  let rec = DB.health.find((x) => x.date === date);
-  if (!rec) { rec = { id: uid(), date, sleep: 0, steps: 0, heartRate: 0, calories: 0, water: 0 }; DB.health.push(rec); }
+  const rec = healthRecord(date);
   const id = rec.id;
   modal('<div class="modal-head"><h3>健康记录 · ' + esc(ymd(date)) + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
-    numField('睡眠（小时）', 'hlSleep', rec.sleep, 0, 24, 0.1) + numField('步数', 'hlSteps', rec.steps, 0, 100000, 100) + numField('心率（BPM）', 'hlHr', rec.heartRate, 0, 200, 1) + numField('卡路里（千卡）', 'hlCal', rec.calories, 0, 10000, 10) + numField('饮水（升）', 'hlWater', rec.water, 0, 10, 0.1) +
+    '<div class="field"><label>睡眠（如 7h 35m 或 7.5）</label><input class="input" id="hlSleep" value="' + (rec.sleep ? fmtSleep(rec.sleep) : '') + '" placeholder="7h 35m"></div>' +
+    '<div class="field"><div class="row gap2" style="gap:8px;align-items:flex-end"><div class="grow"><label>饮水（升）</label><input class="input" type="number" id="hlWater" value="' + (rec.water || '') + '" step="0.05" min="0"></div><button class="btn btn-sm btn-soft" onclick="waterQuick(0.25)">+一杯</button><button class="btn btn-sm btn-soft" onclick="waterQuick(-0.25)">-一杯</button><button class="btn btn-sm btn-soft" onclick="waterReset()">清零</button></div></div>' +
+    '<div class="field"><label>体重（kg）</label><input class="input" type="number" id="hlWeight" value="' + (rec.weight || '') + '" step="0.1" min="0"></div>' +
+    '<div class="field"><label>摄入热量（千卡）</label><input class="input" type="number" id="hlCalIn" value="' + (rec.caloriesIn || '') + '" step="10" min="0"></div>' +
+    '<div class="field"><label>吃了什么（AI 自动估算并累计摄入）</label><div class="row gap2" style="gap:8px"><input class="input" style="flex:1" id="hlFoodDesc" placeholder="如：两个鸡蛋 + 一杯牛奶"><button class="btn btn-sm btn-primary" id="hlFoodAiBtn" onclick="aiEstimateCalories(\'in\')">AI 估算</button></div></div>' +
+    '<div class="field"><label>运动消耗（千卡）</label><input class="input" type="number" id="hlCalOut" value="' + (rec.caloriesOut || '') + '" step="10" min="0"></div>' +
+    '<div class="field"><label>做了什么运动（AI 自动估算并累计消耗）</label><div class="row gap2" style="gap:8px"><input class="input" style="flex:1" id="hlExDesc" placeholder="如：跑步 3 公里"><button class="btn btn-sm btn-primary" id="hlExAiBtn" onclick="aiEstimateCalories(\'out\')">AI 估算</button></div></div>' +
     '</div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveHealthRecord(\'' + id + '\')">保存</button></div>');
 }
-function numField(label, id, val, min, max, step) { return '<div class="field"><label>' + label + '</label><input class="input" type="number" id="' + id + '" value="' + val + '" min="' + min + '" max="' + max + '" step="' + step + '"></div>'; }
+function waterQuick(d) { const el = document.getElementById('hlWater'); if (el) el.value = Math.max(0, Math.round(((+el.value || 0) + d) * 100) / 100); }
+function waterReset() { const el = document.getElementById('hlWater'); if (el) el.value = ''; }
+async function aiEstimateCalories(kind) {
+  const isIn = kind === 'in';
+  const descEl = document.getElementById(isIn ? 'hlFoodDesc' : 'hlExDesc');
+  const numEl = document.getElementById(isIn ? 'hlCalIn' : 'hlCalOut');
+  const btn = document.getElementById(isIn ? 'hlFoodAiBtn' : 'hlExAiBtn');
+  const text = descEl ? descEl.value.trim() : '';
+  if (!text) { toast(isIn ? '先描述吃了什么' : '先描述做了什么运动', true); return; }
+  if (btn) btn.textContent = '估算中…';
+  const r = await apiJson('/api/ai/calories/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, kind }) });
+  if (btn) btn.textContent = 'AI 估算';
+  if (!r.ok) { toast('估算失败：' + (r.message || '服务不可用'), true); return; }
+  const cal = Math.max(0, Math.round(Number(r.data && r.data.calories) || 0));
+  const cur = +(numEl ? numEl.value : 0) || 0;
+  if (numEl) numEl.value = Math.round(cur + cal);
+  toast('已累计 ' + cal + ' 千卡' + (r.data && r.data.note ? '（' + r.data.note + '）' : ''));
+}
 function saveHealthRecord(id) {
   const rec = DB.health.find((x) => x.id === id); if (!rec) return;
-  rec.sleep = +document.getElementById('hlSleep').value || 0; rec.steps = +document.getElementById('hlSteps').value || 0; rec.heartRate = +document.getElementById('hlHr').value || 0; rec.calories = +document.getElementById('hlCal').value || 0; rec.water = +document.getElementById('hlWater').value || 0;
+  const sl = parseSleep(document.getElementById('hlSleep').value);
+  rec.sleep = sl == null ? 0 : sl;
+  rec.water = Math.max(0, +document.getElementById('hlWater').value || 0);
+  const w = parseFloat(document.getElementById('hlWeight').value);
+  rec.weight = Number.isFinite(w) && w > 0 ? w : null;
+  rec.caloriesIn = Math.max(0, +document.getElementById('hlCalIn').value || 0);
+  rec.caloriesOut = Math.max(0, +document.getElementById('hlCalOut').value || 0);
+  rec.updatedAt = Date.now();
   saveDB(); closeModal(); render(); toast('已保存 ✓');
 }
+function editHeight() {
+  const hp = DB.healthProfile || {};
+  modal('<div class="modal-head"><h3>身高</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>身高（cm）</label><input class="input" type="number" id="hpH" value="' + (hp.height || '') + '" step="0.5" min="0"></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveHeight()">保存</button></div>');
+}
+function saveHeight() {
+  if (!DB.healthProfile) DB.healthProfile = { height: null };
+  const v = parseFloat(document.getElementById('hpH').value);
+  DB.healthProfile.height = Number.isFinite(v) && v > 0 ? v : null;
+  saveDB(); closeModal(); render(); toast('已保存 ✓');
+}
+/* ---- 个人病历（隐私区：仅用户手动维护；AI 只建议、不自动写入） ---- */
+const MEDICAL_TYPES = ['过敏史', '疾病', '就诊', '检查', '手术', '用药', '其他'];
+function medicalRecordsSection() {
+  const recs = DB.medicalRecords.slice().sort((a, b) => (b.date || '') < (a.date || '') ? -1 : 1);
+  let html = '<div class="section-head" style="margin-top:6px"><h2>个人病历</h2><button class="more" onclick="medicalRecordModal()">＋ 添加</button></div>';
+  html += '<div class="muted" style="font-size:12px;margin:0 0 10px">隐私信息，仅自己可见；AI 只提供建议，不会自动写入。</div>';
+  if (recs.length === 0) html += '<div class="card card-pad empty" style="padding:20px"><div class="esub">暂无病历记录</div></div>';
+  else html += '<div class="card card-pad" style="padding:8px 10px">' + recs.map((r) => '<div class="task-row" style="cursor:pointer" onclick="medicalRecordModal(\'' + r.id + '\')"><span style="font-size:18px">🩺</span><div class="grow"><div class="t-title">' + esc((r.type ? '[' + r.type + '] ' : '') + (r.title || '')) + '</div><div class="t-meta">' + esc((r.date || '') + (r.diagnosis ? ' · ' + r.diagnosis : '')) + '</div></div><button class="icon-btn" style="border:none;background:none" onclick="event.stopPropagation();deleteMedicalRecord(\'' + r.id + '\')">🗑</button></div>').join('') + '</div>';
+  return html;
+}
+function medicalRecordModal(id) {
+  const r = id ? DB.medicalRecords.find((x) => x.id === id) : null;
+  const typeOpts = MEDICAL_TYPES.map((t) => '<option value="' + t + '"' + (r && r.type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+  modal('<div class="modal-head"><h3>' + (r ? '编辑病历' : '添加病历') + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
+    '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>类型</label><select class="select" id="mrType">' + typeOpts + '</select></div><div class="grow"><label>日期</label><input class="input" type="date" id="mrDate" value="' + (r ? (r.date || '') : todayStr()) + '"></div></div></div>' +
+    '<div class="field"><label>标题</label><input class="input" id="mrTitle" value="' + esc(r ? r.title : '') + '" placeholder="如：感冒 / 青霉素过敏"></div>' +
+    '<div class="field"><label>诊断（医生确诊）</label><input class="input" id="mrDiag" value="' + esc(r ? (r.diagnosis || '') : '') + '"></div>' +
+    '<div class="field"><label>症状</label><input class="input" id="mrSym" value="' + esc(r ? (r.symptoms || '') : '') + '"></div>' +
+    '<div class="field"><label>用药</label><input class="input" id="mrMed" value="' + esc(r ? (r.medication || '') : '') + '"></div>' +
+    '<div class="field"><label>备注</label><textarea class="textarea" id="mrNotes">' + esc(r ? (r.notes || '') : '') + '</textarea></div>' +
+    '</div><div class="modal-foot">' + (r ? '<button class="btn btn-danger" onclick="deleteMedicalRecord(\'' + r.id + '\')">删除</button>' : '') + '<button class="btn" style="margin-left:auto" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveMedicalRecord(\'' + (r ? r.id : '') + '\')">保存</button></div>');
+}
+function saveMedicalRecord(id) {
+  const title = document.getElementById('mrTitle').value.trim();
+  if (!title) { toast('请输入标题', true); return; }
+  const data = { title, type: document.getElementById('mrType').value, date: document.getElementById('mrDate').value || todayStr(), diagnosis: document.getElementById('mrDiag').value.trim(), symptoms: document.getElementById('mrSym').value.trim(), medication: document.getElementById('mrMed').value.trim(), notes: document.getElementById('mrNotes').value.trim(), source: 'user' };
+  if (id) { const r = DB.medicalRecords.find((x) => x.id === id); Object.assign(r, data, { updatedAt: Date.now() }); }
+  else DB.medicalRecords.push({ id: uid(), createdAt: Date.now(), updatedAt: Date.now(), ...data });
+  saveDB(); closeModal(); render(); toast('已保存 ✓');
+}
+function deleteMedicalRecord(id) {
+  confirmDialog('删除病历', '删除这条病历记录？', () => { DB.medicalRecords = DB.medicalRecords.filter((x) => x.id !== id); saveDB(); render(); }, '删除');
+}
 function lineChartSVG(points, color, maxVal) {
-  if (!points.length) return '<div class="muted" style="text-align:center;padding:20px">暂无数据</div>';
+  const vals = (points || []).map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  if (vals.length === 0) return '<div class="muted" style="text-align:center;padding:20px">暂无足够数据</div>';
   const w = 260, h = 80, padX = 6, padY = 8;
-  const max = maxVal || Math.max(...points, 1);
-  const min = Math.min(...points);
+  const max = maxVal || Math.max(...vals, 1);
+  const min = Math.min(...vals);
   const range = (max - min) || 1;
-  const step = (w - padX * 2) / (points.length - 1 || 1);
-  const coords = points.map((v, i) => [padX + i * step, h - padY - ((v - min) / range) * (h - padY * 2)]);
+  const step = (w - padX * 2) / (vals.length - 1 || 1);
+  const coords = vals.map((v, i) => [padX + i * step, h - padY - ((v - min) / range) * (h - padY * 2)]);
   let path = coords.map((c, i) => (i ? 'L' : 'M') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
   const area = path + ' L' + (w - padX) + ',' + (h - padY) + ' L' + padX + ',' + (h - padY) + ' Z';
   const dots = coords.map((c) => '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="2.5" fill="' + color + '"/>').join('');
@@ -1610,7 +1777,7 @@ function lineChartSVG(points, color, maxVal) {
 function drawHealthCharts() {
   const recs = healthRange(OS.ui.healthRange);
   const g = (id, key, color, maxV) => { const el = document.getElementById(id); if (el) el.innerHTML = lineChartSVG(recs.map((r) => r[key]), color, maxV); };
-  g('chSleep', 'sleep', '#8b5cf6', 12); g('chSteps', 'steps', '#10b981'); g('chHr', 'heartRate', '#ef4444', 120); g('chCal', 'calories', '#f97316');
+  g('chWeight', 'weight', '#6b8cae'); g('chIn', 'caloriesIn', '#f97316'); g('chOut', 'caloriesOut', '#10b981'); g('chWater', 'water', '#38bdf8', 4); g('chSleep', 'sleep', '#8b5cf6', 12);
 }
 
 /* ================= STATISTICS ================= */
@@ -1787,45 +1954,70 @@ async function musicAddPlaylist(id) {
     saveDB(); render(); toast('已加入 ' + songs.length + ' 首');
   } catch (e) { toast('获取歌单失败：' + e.message, true); }
 }
+// 安全请求后端 JSON：区分「后端不可达 / 返回非 JSON（被 CDN 回退成 HTML）/ HTTP 错误 / 正常」。
+// 避免直接 r.json() 在返回 HTML 时抛「The string did not match the expected pattern」这类解析错误。
+async function apiJson(path, opts) {
+  let r;
+  try { r = await fetch(API_BASE + path, opts); }
+  catch (e) { return { ok: false, err: 'network', message: '无法连接服务' }; }
+  const ct = r.headers.get('content-type') || '';
+  if (!r.ok) {
+    let msg = 'HTTP ' + r.status;
+    try { const j = await r.json(); if (j && (j.error || j.message)) msg = j.error || j.message; } catch (e) {}
+    return { ok: false, err: 'http', status: r.status, message: msg };
+  }
+  if (ct.indexOf('application/json') === -1) return { ok: false, err: 'not-json', message: '服务响应异常' };
+  try { return { ok: true, data: (await r.json()).data }; }
+  catch (e) { return { ok: false, err: 'parse', message: '服务响应解析失败' }; }
+}
 async function musicLoginModal() {
   if (_neteaseUser) {
     const rows = (_neteasePlaylists || []).map((pl) => '<div class="conv-item" onclick="OS.closeModal();musicAddPlaylist(' + pl.id + ')"><div class="grow"><div style="font-weight:600">' + esc(pl.name) + '</div><div class="c-last">' + pl.count + ' 首</div></div></div>').join('');
     modal('<div class="modal-head"><h3>网易云 · ' + esc(_neteaseUser.nickname) + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' + (rows || '<div class="muted">暂无歌单</div>') + '</div><div class="modal-foot"><button class="btn" onclick="musicLogout()">退出登录</button></div>');
     return;
   }
-  try {
-    const r = await fetch(API_BASE + '/api/music/login/qr');
-    const d = (await r.json()).data;
-    if (!d || !d.qrimg) { toast('获取二维码失败', true); return; }
-    _qrKey = d.key;
-    modal('<div class="modal-head"><h3>登录网易云</h3><button class="x" onclick="OS.closeModal();if(_qrTimer){clearInterval(_qrTimer)}">✕</button></div><div class="modal-body" style="text-align:center"><img src="' + d.qrimg + '" style="width:220px;height:220px;border-radius:12px"><div class="muted" style="margin-top:8px">打开网易云 App 扫码登录</div><div id="qrHint" class="muted" style="margin-top:4px">等待扫码…</div></div>');
-    _qrTimer = setInterval(() => musicQrPoll(d.key), 2000);
-  } catch (e) { toast('登录失败：' + e.message, true); }
+  const r = await apiJson('/api/music/login/qr');
+  if (!r.ok) {
+    // LOGIN_UNAVAILABLE：后端不可达 / 响应非 JSON；LOGIN_FAILED：后端可达但取码失败
+    if (r.err === 'network' || r.err === 'not-json' || r.err === 'parse') toast('登录服务暂不可用，请稍后再试', true);
+    else toast('获取二维码失败：' + r.message, true);
+    return;
+  }
+  const d = r.data;
+  if (!d || !d.qrimg) { toast('获取二维码失败：未返回二维码', true); return; }
+  _qrKey = d.key;
+  modal('<div class="modal-head"><h3>登录网易云</h3><button class="x" onclick="OS.closeModal();if(_qrTimer){clearInterval(_qrTimer)}">✕</button></div><div class="modal-body" style="text-align:center"><img src="' + d.qrimg + '" style="width:220px;height:220px;border-radius:12px"><div class="muted" style="margin-top:8px">打开网易云 App 扫码登录</div><div id="qrHint" class="muted" style="margin-top:4px">等待扫码…</div></div>');
+  _qrTimer = setInterval(() => musicQrPoll(d.key), 2000);
 }
 async function musicQrPoll(key) {
-  try {
-    const r = await fetch(API_BASE + '/api/music/login/check?key=' + key);
-    const d = (await r.json()).data; if (!d) return;
-    const hint = document.getElementById('qrHint');
-    if (d.code === 803) { if (_qrTimer) clearInterval(_qrTimer); if (hint) hint.textContent = '登录成功 ♥'; toast('网易云登录成功：' + (d.nickname || '')); await musicRefreshStatus(); OS.closeModal(); }
-    else if (d.code === 800) { if (_qrTimer) clearInterval(_qrTimer); if (hint) hint.textContent = '二维码已过期，请重新打开'; }
-    else if (d.code === 802) { if (hint) hint.textContent = '已扫码，请在手机上确认'; }
-    else if (d.code === 801) { if (hint) hint.textContent = '等待扫码…'; }
-  } catch (e) {}
+  const r = await apiJson('/api/music/login/check?key=' + encodeURIComponent(key));
+  const hint = document.getElementById('qrHint');
+  if (!r.ok) {
+    // 后端不可达 / 响应异常：停止轮询并明确提示，而非静默失败
+    if (r.err === 'network' || r.err === 'not-json' || r.err === 'parse') {
+      if (_qrTimer) clearInterval(_qrTimer);
+      if (hint) hint.textContent = '登录服务不可用';
+      toast('登录服务暂不可用，请稍后再试', true);
+    }
+    return;
+  }
+  const d = r.data; if (!d) return;
+  if (d.code === 803) { if (_qrTimer) clearInterval(_qrTimer); if (hint) hint.textContent = '登录成功 ♥'; toast('网易云登录成功：' + (d.nickname || '')); await musicRefreshStatus(); OS.closeModal(); }
+  else if (d.code === 800) { if (_qrTimer) clearInterval(_qrTimer); if (hint) hint.textContent = '二维码已过期，请重新打开'; }
+  else if (d.code === 802) { if (hint) hint.textContent = '已扫码，请在手机上确认'; }
+  else if (d.code === 801) { if (hint) hint.textContent = '等待扫码…'; }
 }
 async function musicRefreshStatus() {
-  try {
-    const r = await fetch(API_BASE + '/api/music/status');
-    if (!r.ok) return;
-    const u = (await r.json()).data || null;
-    const changed = (!!u !== !!_neteaseUser) || (u && _neteaseUser && u.userId !== _neteaseUser.userId);
-    _neteaseUser = u;
-    if (u) {
-      const pr = await fetch(API_BASE + '/api/music/playlists');
-      _neteasePlaylists = pr.ok ? ((await pr.json()).data || []) : [];
-    } else _neteasePlaylists = [];
-    if (changed) render();
-  } catch (e) {}
+  const r = await apiJson('/api/music/status');
+  if (!r.ok) return;
+  const u = r.data || null;
+  const changed = (!!u !== !!_neteaseUser) || (u && _neteaseUser && u.userId !== _neteaseUser.userId);
+  _neteaseUser = u;
+  if (u) {
+    const pr = await apiJson('/api/music/playlists');
+    _neteasePlaylists = pr.ok ? (pr.data || []) : [];
+  } else _neteasePlaylists = [];
+  if (changed) render();
 }
 async function musicLogout() {
   try { await fetch(API_BASE + '/api/music/logout', { method: 'POST' }); } catch (e) {}
@@ -2039,8 +2231,18 @@ function viewSearch() {
 
 /* ---------------- file helpers ---------------- */
 function readAsDataURL(file) { return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.target.result); r.onerror = reject; r.readAsDataURL(file); }); }
-function cropSquareImage(file) {
-  return new Promise((resolve) => { const reader = new FileReader(); reader.onload = function(e) { const img = new Image(); img.onload = function() { const size = Math.min(img.width, img.height); const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const ctx = canvas.getContext('2d'); const sx = (img.width - size) / 2, sy = (img.height - size) / 2; ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200); resolve(canvas.toDataURL('image/png')); }; img.src = e.target.result; }; reader.readAsDataURL(file); });
+function cropSquareImage(file, type = 'image/png', quality) {
+  return new Promise((resolve) => { const reader = new FileReader(); reader.onload = function(e) { const img = new Image(); img.onload = function() { const size = Math.min(img.width, img.height); const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const ctx = canvas.getContext('2d'); const sx = (img.width - size) / 2, sy = (img.height - size) / 2; ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200); resolve(canvas.toDataURL(type, quality)); }; img.src = e.target.result; }; reader.readAsDataURL(file); });
+}
+// 把助手头像（JPEG data URL）上传到现有文件存储，返回公网 URL（供 Bark icon 使用）。
+// 上传失败（后端不可达 / 本地开发）时返回 ''，Bark 自动回退默认图标，不阻断保存。
+async function uploadAssistantAvatar(dataUrl) {
+  try {
+    const r = await fetch(API_BASE + '/api/files/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: 'assistant-avatar.jpg', mimeType: 'image/jpeg', dataBase64: dataUrl }) });
+    if (!r.ok) return '';
+    const j = await r.json().catch(() => ({}));
+    return (j.data && j.data.publicUrl) || '';
+  } catch (e) { return ''; }
 }
 
 /* ================= 我的日志 (Journal) ================= */
@@ -2133,15 +2335,13 @@ function deleteJournalEntry(id) {
 function viewProfile() {
   const p = DB.profile;
   const maxStreak = DB.habits.reduce((m, h) => Math.max(m, habitStreak(h)), 0);
-  const done = DB.tasks.filter((t) => t.completed).length;
   let html = '<div class="profile-head" style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:22px">' +
     '<div class="avatar" style="width:96px;height:96px;font-size:44px;display:flex;align-items:center;justify-content:center;' + (p.avatar ? 'background-image:url(' + p.avatar + ')' : '') + '">' + (p.avatar ? '' : '🐰') + '</div>' +
     '<div style="text-align:center"><div class="h1" style="margin-bottom:4px">' + esc(p.name || '未命名') + '</div><div class="muted">' + esc(p.signature || '这个人很懒，还没有签名') + '</div></div>' +
     '<div class="row" style="gap:8px"><button class="btn btn-soft btn-sm" onclick="editProfile()">✎ 编辑资料</button><button class="btn btn-sm" onclick="document.getElementById(\'pfAvatar\').click()">📷 换头像</button><input type="file" id="pfAvatar" accept="image/*" style="display:none" onchange="changeProfileAvatar(this)"></div></div>';
-  html += '<div class="grid cols-4" style="margin-bottom:22px">' +
-    pstat(DB.tasks.length, 'Tasks', '/today') + pstat(DB.plans.filter((x) => !x.archived).length, 'Plans', '/plans') + pstat(DB.habits.length, 'Habits', '/habit') + pstat(maxStreak, 'Streak 🔥', '/habit') + '</div>';
+
   html += '<div class="section-head"><h2>我的空间</h2></div><div class="grid cols-2">';
-  const links = [ ['📖', '我的日志', (DB.journal || []).length + ' 条', '/journal'], ['📝', '笔记', DB.notes.length + ' 篇', '/notes'], ['💬', 'AI Chat', '与 Bunny 对话', '/chat'], ['🎵', '音乐', DB.player.playlist.length + ' 首', '/player'], ['📊', '统计', '数据总览', '/statistics'] ];
+  const links = [ ['📖', '我的日志', (DB.journal || []).length + ' 条', '/journal'], ['📝', '笔记', DB.notes.length + ' 篇', '/notes'], ['💬', 'AI Chat', '与 Bunny 对话', '/chat'], ['🎵', '音乐', DB.player.playlist.length + ' 首', '/player'] ];
   html += links.map((l) => '<div class="card card-pad" style="cursor:pointer;display:flex;align-items:center;gap:12px" onclick="OS.go(\'' + l[3] + '\')"><span style="font-size:26px">' + l[0] + '</span><div class="grow"><div style="font-weight:700">' + l[1] + '</div><div class="muted" style="font-size:12px">' + l[2] + '</div></div><span style="color:var(--text-faint)">›</span></div>').join('');
   html += '</div>';
 
@@ -2150,6 +2350,12 @@ function viewProfile() {
   html += '<div class="section-head" style="margin-top:22px"><h2>我的日志</h2><button class="more" onclick="OS.go(\'/journal\')">查看全部日志 ›</button></div>';
   if (recent.length === 0) html += '<div class="card card-pad empty" style="padding:20px"><div class="esub">还没有日志，记下今天吧</div></div>';
   else html += '<div>' + recent.map((j) => '<div class="journal-entry" style="margin-bottom:10px"><div class="j-top"><span class="j-symbol">' + (j.moodSymbol ? esc(j.moodSymbol) : '·') + '</span><span class="j-time">' + esc(journalDateLabel(j.date) + ' · ' + (j.time || '')) + '</span></div><div class="j-content">' + esc(j.content) + '</div></div>').join('') + '</div>';
+
+  // 底部：Task/Plans/Habits/Streaks 两行紧凑统计卡片（移除原「统计」区）
+  html += '<div class="section-head" style="margin-top:22px"><h2>数据总览</h2></div>';
+  html += '<div class="grid cols-2" style="margin-bottom:8px">' +
+    pstat(DB.tasks.length, 'Tasks', '/today') + pstat(DB.plans.filter((x) => !x.archived).length, 'Plans', '/plans') +
+    pstat(DB.habits.filter((h) => isHabitDone(h, todayStr())).length + ' / ' + DB.habits.length, 'Habits', '/habit') + pstat(maxStreak, 'Streak 🔥', '/habit') + '</div>';
   return html;
 }
 function pstat(v, label, route) { return '<div class="card stat-card" style="cursor:pointer;text-align:center" onclick="OS.go(\'' + route + '\')"><div class="v">' + v + '</div><div class="l">' + label + '</div></div>'; }
@@ -2213,14 +2419,14 @@ async function changeWallpaper(input) { if (!input.files[0]) return; DB.appearan
 function removeWallpaper() { DB.appearance.wallpaper = ''; saveDB(); applyTheme(); render(); }
 
 /* ================= SETTINGS / AI ================= */
-function aiSet() { if (!DB.aiSettings) DB.aiSettings = { aiName: 'Bunny', assistantAvatar: '', bubbleOpacity: 0.9, model: 'deepseek-chat', systemPrompt: '', streaming: true, memory: true, autoCompress: true }; return DB.aiSettings; }
+function aiSet() { if (!DB.aiSettings) DB.aiSettings = { aiName: 'Bunny', assistantAvatar: '', assistantAvatarUrl: '', bubbleOpacity: 0.9, model: 'deepseek-chat', systemPrompt: '', streaming: true, memory: true, autoCompress: true }; return DB.aiSettings; }
 function viewSettingsAI() {
   const s = aiSet();
   let html = '<div class="h1" style="margin-bottom:16px">我的AI 设置</div><div class="card card-pad">' +
     '<div class="field"><label>AI 名字</label><input class="input" id="aiName" value="' + esc(s.aiName) + '"></div>' +
     '<div class="field"><label>系统提示词（AI 人格）</label><textarea class="textarea" id="aiPrompt">' + esc(s.systemPrompt) + '</textarea></div>' +
     '<div class="field"><label>默认模型</label><select class="select" id="aiModel"><optgroup label="DeepSeek"><option value="deepseek-chat"' + (s.model === 'deepseek-chat' ? ' selected' : '') + '>DeepSeek Chat</option><option value="deepseek-reasoner"' + (s.model === 'deepseek-reasoner' ? ' selected' : '') + '>DeepSeek Reasoner</option></optgroup><optgroup label="OpenAI"><option value="gpt-4o"' + (s.model === 'gpt-4o' ? ' selected' : '') + '>GPT-4o</option><option value="gpt-4o-mini"' + (s.model === 'gpt-4o-mini' ? ' selected' : '') + '>GPT-4o mini</option></optgroup><optgroup label="Claude"><option value="claude-sonnet-5"' + (s.model === 'claude-sonnet-5' ? ' selected' : '') + '>Claude Sonnet 5</option><option value="claude-opus-5"' + (s.model === 'claude-opus-5' ? ' selected' : '') + '>Claude Opus 5</option></optgroup></select></div>' +
-    '<div class="field"><label>助手头像</label><div class="row" style="gap:8px;align-items:center"><div class="grow"><input class="input" id="aiAvatarFile" type="file" accept="image/*"></div></div></div>' +
+    '<div class="field"><label>助手头像</label><div class="row" style="gap:8px;align-items:center"><div class="grow"><input class="input" id="aiAvatarFile" type="file" accept="image/*"></div></div><div class="muted" style="font-size:11px;margin-top:6px">助手头像也会作为 Bark 推送通知的图标，自动同步。</div></div>' +
     '<div class="field"><label>气泡透明度：<span id="bubVal">' + s.bubbleOpacity + '</span></label><input type="range" min="0.1" max="1" step="0.05" value="' + s.bubbleOpacity + '" style="width:100%" oninput="document.getElementById(\'bubVal\').textContent=this.value"></div>' +
     toggles() +
     '</div><div class="card card-pad" style="margin-top:14px">' + aiPermTogglesHtml() + '</div><div style="padding:16px"><button class="btn btn-primary btn-block" onclick="saveAISettings()">保存 AI 设置</button></div>';
@@ -2238,7 +2444,13 @@ async function saveAISettings() {
   s.systemPrompt = document.getElementById('aiPrompt').value;
   s.model = document.getElementById('aiModel').value;
   s.bubbleOpacity = parseFloat(document.getElementById('bubVal').textContent) || 0.9;
-  const av = document.getElementById('aiAvatarFile'); if (av.files[0]) s.assistantAvatar = await cropSquareImage(av.files[0]);
+  const av = document.getElementById('aiAvatarFile');
+  if (av.files[0]) {
+    const jpeg = await cropSquareImage(av.files[0], 'image/jpeg', 0.9);
+    s.assistantAvatar = jpeg;                 // UI 显示用（data URL，离线也可见）
+    const pub = await uploadAssistantAvatar(jpeg);
+    if (pub) s.assistantAvatarUrl = pub;      // Bark 图标用（公网 JPG URL）
+  }
   saveDB(); render(); toast('已保存 ✓');
   if (OS.chat.currentId) OS.chat.saveSessionSettings();
 }
@@ -2935,6 +3147,160 @@ function shopItemHtml(it) {
     '<div class="muted" style="font-size:11px;margin-top:2px">' + (it.category ? '<span class="shop-cat">' + esc(it.category) + '</span> ' : '') + (it.priority === 'high' ? '<span class="chip" style="font-size:10px;color:#db2777">重要</span> ' : '') + (it.note ? esc(it.note) : '') + '</div>' +
     '</div><button class="icon-btn" style="border:none;background:none;color:var(--text-faint)" onclick="deleteShoppingItem(\'' + it.id + '\')">🗑</button></div>';
 }
+/* ================= FINANCE 记账 ================= */
+function fmtMoney(c) { const n = Number(c) || 0; return '￥' + (n / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+const EXPENSE_CATEGORIES = ['吃饭', '娱乐', '生活用品', '看病', '零食', '学习', '交通', '住房', '通讯', '服饰', '旅行', '其他'];
+const INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '红包', '其他'];
+let _exKind = false; // false=支出 true=收入
+function financeIsIncome(e) { return e && e.kind === 'income'; }
+function financeSummaryLocal() {
+  const mk = todayStr().slice(0, 7);
+  const ex = DB.expenses || [];
+  const isExp = (e) => !financeIsIncome(e);
+  const monthExpenseCents = ex.filter((e) => isExp(e) && String(e.occurredAt || '').startsWith(mk)).reduce((s, e) => s + (Number(e.amountCents) || 0), 0);
+  const monthIncomeCents = ex.filter((e) => !isExp(e) && String(e.occurredAt || '').startsWith(mk)).reduce((s, e) => s + (Number(e.amountCents) || 0), 0);
+  const todayExpenseCents = ex.filter((e) => isExp(e) && e.occurredAt === todayStr()).reduce((s, e) => s + (Number(e.amountCents) || 0), 0);
+  const cat = {};
+  ex.filter((e) => isExp(e) && String(e.occurredAt || '').startsWith(mk)).forEach((e) => { const c = e.category || '其他'; cat[c] = (cat[c] || 0) + (Number(e.amountCents) || 0); });
+  const budget = DB.budget && DB.budget.monthlyCents;
+  return { monthExpenseCents, monthIncomeCents, todayExpenseCents, cat, budget };
+}
+function viewFinance() {
+  const s = financeSummaryLocal();
+  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">记账</div><div class="muted">收支 · 预算 · 分类统计</div></div><button class="btn btn-primary" onclick="expenseModal(null)">＋ 记一笔</button></div>';
+  html += '<div class="grid cols-2" style="margin-bottom:16px">' +
+    '<div class="card stat-card"><div style="font-size:20px;margin-bottom:6px">📉</div><div class="v">' + fmtMoney(s.todayExpenseCents) + '</div><div class="l">今日支出</div></div>' +
+    '<div class="card stat-card"><div style="font-size:20px;margin-bottom:6px">📉</div><div class="v">' + fmtMoney(s.monthExpenseCents) + '</div><div class="l">本月支出</div></div>' +
+    '<div class="card stat-card"><div style="font-size:20px;margin-bottom:6px">📈</div><div class="v">' + fmtMoney(s.monthIncomeCents) + '</div><div class="l">本月收入</div></div>' +
+    '<div class="card stat-card" style="cursor:pointer" onclick="budgetModal()"><div style="font-size:20px;margin-bottom:6px">🎯</div><div class="v">' + (s.budget ? fmtMoney(s.budget) : '—') + '</div><div class="l">本月预算</div><div class="u">点击设置</div></div>' +
+    '</div>';
+  const cats = Object.entries(s.cat).sort((a, b) => b[1] - a[1]);
+  if (cats.length) {
+    const max = cats[0][1];
+    html += '<div class="section-head"><h2>本月分类统计</h2></div><div class="card card-pad" style="padding:14px">' +
+      cats.map(([c, v]) => '<div style="margin-bottom:10px"><div class="row" style="justify-content:space-between;font-size:13px;margin-bottom:4px"><span>' + esc(c) + '</span><span class="muted">' + fmtMoney(v) + '</span></div><div class="progress"><span style="width:' + Math.round((v / max) * 100) + '%"></span></div></div>').join('') + '</div>';
+  }
+  const list = (DB.expenses || []).slice().sort((a, b) => (b.occurredAt || '') < (a.occurredAt || '') ? -1 : 1).slice(0, 50);
+  html += '<div class="section-head"><h2>最近记录</h2></div>';
+  html += '<div class="card card-pad" style="padding:4px 8px">' + (list.length ? list.map(financeRowHtml).join('') : '<div class="empty"><div class="eico">💰</div><div class="etitle">还没有记账</div><div class="esub">点「记一笔」开始记录收支</div></div>') + '</div>';
+  return html;
+}
+function financeRowHtml(e) {
+  const income = financeIsIncome(e);
+  return '<div class="task-row" style="cursor:pointer" onclick="expenseModal(\'' + e.id + '\')">' +
+    '<span style="font-size:18px">' + (income ? '💵' : '💸') + '</span>' +
+    '<div class="grow"><div class="t-title">' + esc(e.title || '未命名') + '</div><div class="t-meta">' + esc((e.category ? e.category + ' · ' : '') + (e.occurredAt || '') + (e.note ? ' · ' + e.note : '')) + '</div></div>' +
+    '<div style="text-align:right;font-weight:700;' + (income ? 'color:#16a34a' : '') + '">' + (income ? '+' : '-') + fmtMoney(e.amountCents) + '</div>' +
+    '<button class="icon-btn" style="border:none;background:none" onclick="event.stopPropagation();deleteExpense(\'' + e.id + '\')">🗑</button>' +
+    '</div>';
+}
+function expenseModal(id) {
+  const e = id ? (DB.expenses || []).find((x) => x.id === id) : null;
+  _exKind = financeIsIncome(e);
+  const catList = _exKind ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const catOpts = catList.map((c) => '<option value="' + c + '"' + (e && e.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
+  modal('<div class="modal-head"><h3>' + (e ? '编辑记录' : '记一笔') + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' +
+    '<div class="field"><div class="seg" style="width:100%"><button class="' + (!_exKind ? 'on' : '') + '" onclick="expenseKindToggle(false)" style="flex:1">💸 支出</button><button class="' + (_exKind ? 'on' : '') + '" onclick="expenseKindToggle(true)" style="flex:1">💵 收入</button></div></div>' +
+    '<div class="field"><label id="exTitleLabel">' + (_exKind ? '收入名' : '条目') + '</label><input class="input" id="exTitle" value="' + esc(e ? e.title : '') + '" placeholder="' + (_exKind ? '如：工资' : '如：麻辣烫') + '"></div>' +
+    '<div class="field"><label>金额（元）</label><input class="input" type="number" id="exAmount" value="' + (e ? ((Number(e.amountCents) || 0) / 100) : '') + '" step="0.01" min="0" placeholder="0.00"></div>' +
+    '<div class="field"><div class="row gap2" style="gap:8px"><div class="grow"><label>分类</label><select class="select" id="exCat">' + catOpts + '</select></div><div class="grow"><label>日期</label><input class="input" type="date" id="exDate" value="' + (e ? (e.occurredAt || todayStr()) : todayStr()) + '"></div></div></div>' +
+    '<div class="field"><label>备注</label><input class="input" id="exNote" value="' + esc(e ? (e.note || '') : '') + '"></div>' +
+    '</div><div class="modal-foot">' + (e ? '<button class="btn btn-danger" onclick="deleteExpense(\'' + e.id + '\')">删除</button>' : '') + '<button class="btn" style="margin-left:auto" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveExpense(\'' + (e ? e.id : '') + '\')">保存</button></div>');
+}
+function expenseKindToggle(income) {
+  _exKind = income;
+  const sel = document.getElementById('exCat'); if (!sel) return;
+  sel.innerHTML = (income ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((c) => '<option value="' + c + '">' + c + '</option>').join('');
+  const ti = document.getElementById('exTitle'); if (ti) ti.placeholder = income ? '如：工资' : '如：麻辣烫';
+  const lab = document.getElementById('exTitleLabel'); if (lab) lab.textContent = income ? '收入名' : '条目';
+}
+function saveExpense(id) {
+  const title = document.getElementById('exTitle').value.trim();
+  const amount = parseFloat(document.getElementById('exAmount').value);
+  if (!title) { toast('请输入条目', true); return; }
+  if (!Number.isFinite(amount) || amount <= 0) { toast('请输入有效金额', true); return; }
+  const data = { title, amountCents: Math.round(amount * 100), category: document.getElementById('exCat').value, occurredAt: document.getElementById('exDate').value || todayStr(), note: document.getElementById('exNote').value.trim(), kind: _exKind ? 'income' : 'expense', currency: 'CNY' };
+  if (id) { const e = DB.expenses.find((x) => x.id === id); Object.assign(e, data, { updatedAt: Date.now() }); }
+  else DB.expenses.push({ id: uid(), createdAt: Date.now(), updatedAt: Date.now(), ...data });
+  saveDB(); closeModal(); render(); toast('已保存 ✓');
+}
+function deleteExpense(id) {
+  confirmDialog('删除记录', '删除这条收支记录？', () => { DB.expenses = DB.expenses.filter((x) => x.id !== id); saveDB(); render(); }, '删除');
+}
+function budgetModal() {
+  const b = DB.budget;
+  modal('<div class="modal-head"><h3>本月预算</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>预算（元/月）</label><input class="input" type="number" id="bgAmount" value="' + (b && b.monthlyCents ? (b.monthlyCents / 100) : '') + '" step="100" min="0" placeholder="如：2000"></div><div class="muted" style="font-size:12px">用于「我的AI」帮你控制本月开销；留空可清除预算。</div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="saveBudget()">保存</button></div>');
+}
+function saveBudget() {
+  const v = parseFloat(document.getElementById('bgAmount').value);
+  const cents = Number.isFinite(v) && v > 0 ? Math.round(v * 100) : null;
+  DB.budget = { monthlyCents: cents, currency: 'CNY', updatedAt: Date.now() };
+  saveDB(); closeModal(); render(); toast(cents ? '已设置预算 ✓' : '已清除预算');
+}
+
+/* ================= PERIOD 经期 ================= */
+function periodSorted() { return (DB.menstrualCycles || []).slice().sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0)); }
+function periodPrediction() {
+  const sorted = periodSorted();
+  const ongoing = sorted.find((c) => c.startDate && !c.endDate) || null;
+  const closed = sorted.filter((c) => c.startDate && c.endDate);
+  let avgCycle = null;
+  if (closed.length >= 2) {
+    let sum = 0, n = 0;
+    for (let i = 1; i < closed.length; i++) {
+      const d = Math.round((parseDate(closed[i].startDate) - parseDate(closed[i - 1].startDate)) / 86400000);
+      if (d >= 15 && d <= 60) { sum += d; n++; }
+    }
+    if (n) avgCycle = Math.round(sum / n);
+  }
+  const last = closed.length ? closed[closed.length - 1] : (sorted.length ? sorted[sorted.length - 1] : null);
+  const nextStart = (avgCycle && last) ? addDays(last.startDate, avgCycle) : null;
+  return { ongoing, closed, avgCycle, last, nextStart };
+}
+function viewPeriod() {
+  const p = periodPrediction();
+  const sorted = periodSorted().slice().reverse();
+  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">经期</div><div class="muted">经期记录与预测 · 隐私</div></div><div class="row" style="gap:8px"><button class="btn btn-sm ' + (p.ongoing ? '' : 'btn-primary') + '" onclick="periodStartModal()">' + (p.ongoing ? '进行中' : '＋ 记录开始') + '</button>' + (p.ongoing ? '<button class="btn btn-sm" onclick="periodEndModal()">记录结束</button>' : '') + '</div></div>';
+  let pred = '<div class="card card-pad" style="margin-bottom:16px">';
+  if (p.ongoing) pred += '<div style="font-weight:700;font-size:15px">🌸 经期中</div><div class="muted" style="font-size:13px;margin-top:4px">开始于 ' + esc(p.ongoing.startDate) + '，记得点「记录结束」</div>';
+  else if (p.nextStart) pred += '<div style="font-weight:700;font-size:15px">🔮 预计下次</div><div class="muted" style="font-size:13px;margin-top:4px">约 ' + esc(p.nextStart) + '（平均周期 ' + p.avgCycle + ' 天）</div>';
+  else pred += '<div style="font-weight:700;font-size:15px">📝 暂无预测</div><div class="muted" style="font-size:13px;margin-top:4px">记录几次经期后，会逐步估算你的周期</div>';
+  pred += '<div class="muted" style="font-size:11px;margin-top:8px">预测仅供参考，不构成医学诊断。</div></div>';
+  html += pred;
+  html += '<div class="section-head"><h2>历史记录</h2></div>';
+  html += '<div class="card card-pad" style="padding:4px 8px">' + (sorted.length ? sorted.map(periodRowHtml).join('') : '<div class="empty"><div class="eico">🌸</div><div class="etitle">还没有记录</div><div class="esub">点「记录开始」添加第一条经期</div></div>') + '</div>';
+  return html;
+}
+function periodRowHtml(c) {
+  const dur = c.durationDays ? '持续 ' + c.durationDays + ' 天' : (c.endDate ? '' : '进行中');
+  return '<div class="task-row"><span style="font-size:18px">🌸</span><div class="grow"><div class="t-title">' + esc(c.startDate) + (c.endDate ? ' → ' + esc(c.endDate) : '') + '</div><div class="t-meta">' + esc(dur || '') + '</div></div><button class="icon-btn" style="border:none;background:none" onclick="deleteCycle(\'' + c.id + '\')">🗑</button></div>';
+}
+function periodStartModal() {
+  if (periodPrediction().ongoing) { toast('已有进行中的经期，请先记录结束', true); return; }
+  modal('<div class="modal-head"><h3>记录经期开始</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>开始日期</label><input class="input" type="date" id="pdStart" value="' + todayStr() + '"></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="savePeriodStart()">保存</button></div>');
+}
+function savePeriodStart() {
+  const date = document.getElementById('pdStart').value || todayStr();
+  if (periodPrediction().ongoing) { toast('已有进行中的经期', true); closeModal(); return; }
+  DB.menstrualCycles.push({ id: uid(), startDate: date, endDate: null, durationDays: null, cycleLengthDays: null, createdAt: Date.now(), updatedAt: Date.now() });
+  saveDB(); closeModal(); render(); toast('已记录 ✓');
+}
+function periodEndModal() {
+  if (!periodPrediction().ongoing) { toast('没有进行中的经期', true); return; }
+  modal('<div class="modal-head"><h3>记录经期结束</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>结束日期</label><input class="input" type="date" id="pdEnd" value="' + todayStr() + '"></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="savePeriodEnd()">保存</button></div>');
+}
+function savePeriodEnd() {
+  const date = document.getElementById('pdEnd').value || todayStr();
+  const open = periodSorted().filter((c) => !c.endDate).sort((a, b) => (a.startDate > b.startDate ? -1 : 1))[0];
+  if (!open) { toast('没有进行中的经期', true); closeModal(); return; }
+  const dur = Math.max(1, Math.round((parseDate(date) - parseDate(open.startDate)) / 86400000) + 1);
+  open.endDate = date; open.durationDays = dur; open.updatedAt = Date.now();
+  saveDB(); closeModal(); render(); toast('已记录 ✓');
+}
+function deleteCycle(id) {
+  confirmDialog('删除经期记录', '删除这条经期记录？', () => { DB.menstrualCycles = DB.menstrualCycles.filter((x) => x.id !== id); saveDB(); render(); }, '删除');
+}
+
 function viewShopping() {
   const mine = shoppingItemsOf('mine'), deity = shoppingItemsOf('deity');
   const mineLeft = mine.filter((i) => !i.completed).length, deityLeft = deity.filter((i) => !i.completed).length;
@@ -3160,6 +3526,15 @@ function aiProactiveTick() { /* 预留：定时主动感知入口 */ }
 init();
 aiBootstrap();
 musicRefreshStatus();
+
+/* ================= PWA ================= */
+// 注册 Service Worker（同源部署 + Vercel 前端均适用；scope 为站点根）。
+// 仅在 https 或 localhost 下注册（Service Worker 要求安全上下文）。
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[PWA] SW 注册失败', e));
+  });
+}
 
 /*__APPEND__*/
   </script>

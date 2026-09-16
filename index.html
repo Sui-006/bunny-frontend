@@ -281,6 +281,7 @@
     .sheet-item:hover { background: var(--accent-tint); }
     .sheet-item .ico { width: 26px; text-align: center; font-size: 19px; }
     .sheet-grab { width: 40px; height: 4px; border-radius: 4px; background: var(--border-strong); margin: 4px auto 10px; }
+    .sheet-head { margin-bottom: 12px; }
     #toastRoot { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
     .toast { background: var(--card-solid); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 14px; font-size: 13.5px; box-shadow: var(--shadow-md); animation: toastIn 0.25s ease; display: flex; align-items: center; gap: 8px; }
     @keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
@@ -349,9 +350,25 @@
       .bubble.in { background: color-mix(in srgb, var(--card-solid) calc(var(--bubble-alpha, 1) * 100%), transparent); }
       .bubble.out { background: color-mix(in srgb, var(--accent) calc(var(--bubble-alpha, 1) * 100%), transparent); }
     }
-    .chat-input-bar { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
-    .chat-input { flex: 1; resize: none; border: 1px solid var(--border); border-radius: 22px; padding: 10px 16px; font-size: 14px; outline: none; max-height: 110px; min-height: 42px; background: var(--card-solid); }
+    .chat-input-bar { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px calc(10px + env(safe-area-inset-bottom) + var(--chat-keyboard-inset, 0px)); border-top: 1px solid var(--border); }
+    .chat-input { flex: 1; min-width: 0; resize: none; border: 1px solid var(--border); border-radius: 22px; padding: 10px 16px; font-size: 14px; line-height: 1.5; outline: none; max-height: 132px; min-height: 42px; background: var(--card-solid); overflow-y: auto; }
     .chat-input:focus { border-color: var(--accent-border); }
+    /* composer 按钮：+ / 发送 / 停止 不重叠，等宽圆角 */
+    .composer-btn { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--card-solid); cursor: pointer; font-size: 18px; color: var(--accent-strong); transition: background 0.15s, transform 0.1s; }
+    .composer-btn:hover { background: var(--accent-tint); }
+    .composer-btn:active { transform: scale(0.94); }
+    .composer-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .composer-btn.send { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .composer-btn.send:disabled { background: var(--accent); opacity: 0.45; }
+    .composer-btn.stop { background: #fbeaea; border-color: #f3cdcd; color: #c0392b; }
+    .composer-btn.stop:hover { background: #f6d8d8; }
+    /* 回到底部 */
+    .chat-scroll-top { position: absolute; bottom: 16px; right: 18px; width: 40px; height: 40px; border-radius: 50%; background: var(--card-solid); border: 1px solid var(--border); box-shadow: var(--shadow-md); color: var(--accent-strong); font-size: 18px; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 5; }
+    .chat-scroll-top.show { display: flex; }
+    /* 空状态建议 chips */
+    .chat-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+    .chat-suggest .chip { cursor: pointer; border: 1px solid var(--accent-line); background: var(--card-solid); }
+    .chat-suggest .chip:hover { background: var(--accent-tint); }
 
     /* 聊天气泡操作：小图标、淡色、默认隐藏，hover / 长按 / 点击出现 */
     .chat-msg-row { position: relative; }
@@ -368,11 +385,17 @@
     .quote-card .q-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px; }
 
     /* 聊天背景（用户可设默认 / 纯色 / 图片） */
-    .chat-stage { position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    /* ChatRoot：fixed 锚定视觉视口，高度跟随 --chat-vh（visualViewport），键盘弹出只改高度、不平移整页 */
+    .chat-stage { position: fixed; top: 0; left: 0; right: 0; width: 100%; height: var(--chat-vh, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
     .chat-stage .chat-bg { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
     .chat-stage .chat-bg-overlay { position: absolute; inset: 0; background: var(--card-solid); opacity: 0.72; z-index: 1; }
     html[data-theme="dark"] .chat-stage .chat-bg-overlay { opacity: 0.82; }
     .chat-stage > * { position: relative; z-index: 2; }
+    /* 顶部栏 / 消息区 / composer 均为 ChatRoot 的流式子项，不随文档滚动 */
+    .chat-header { flex-shrink: 0; }
+    .chat-body { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .chat-title { cursor: pointer; }
+    .chat-title:hover { text-decoration: underline; text-decoration-color: var(--accent-soft); }
 
     /* 会话列表（侧栏式，⋮ 菜单） */
     .session-list { display: flex; flex-direction: column; gap: 2px; }
@@ -661,6 +684,7 @@ function defaultDB() {
       notifications: [],
       _asked: {},
     },
+    memorySettings: { enabled: true, autoSaveEnabled: true, confirmationMode: 'ask_before_save' },
     shoppingLists: [ { id: 'mine', type: 'mine', title: '我的清单' }, { id: 'deity', type: 'deity', title: '祂的清单' } ],
     shoppingItems: [],
     weather: null,
@@ -682,7 +706,11 @@ function defaultDB() {
     menstrualCycles: [],
     medicalRecords: [],
     notes: [ { id: uid(), title: '欢迎使用 Bunny\'s Home', content: '这是一个属于你的个人数字空间。\n\n· 点击右下角 + 快速创建任务 / 计划 / 习惯\n· 我的AI 可以帮你安排今天\n· 所有数据都保存在本地', tags: ['欢迎'], pinned: true, createdAt: Date.now(), updatedAt: Date.now() } ],
-    player: { playlist: [ { title: 'Turning Page', artist: 'Sleeping At Last', cover: '', duration: 255 } ], current: 0, playing: false, currentTime: 0, volume: 0.8, togetherListening: false },
+    player: { playlist: [ { title: 'Turning Page', artist: 'Sleeping At Last', cover: '', duration: 255 } ], current: 0, playing: false, currentTime: 0, volume: 0.8, togetherListening: false, autoNext: false },
+    // 「一起听」陪听会话 / 音乐品味画像 / 收听历史（与后端 user_state 结构一致，绝不伪造）
+    listeningSession: null,
+    musicTasteProfile: { favoriteArtists: [], favoriteGenres: [], favoriteSongs: [], dislikedArtists: [], dislikedSongs: [], likedPatterns: [], dislikedPatterns: [], moodPreferences: [], discoveryHistory: [], updatedAt: 0 },
+    listeningHistory: [],
     notifications: [
       { id: uid(), type: 'ai', title: '我的AI', body: '欢迎来到 Bunny\'s Home 👋', read: false, time: Date.now() },
       { id: uid(), type: 'task', title: '任务提醒', body: '你有 5 个待办任务在今天', read: false, time: Date.now() - 3600000 },
@@ -708,6 +736,10 @@ function loadDB() {
   if (!Array.isArray(db.alarms)) db.alarms = [];
   if (!db.player) db.player = def.player;
   if (db.player.togetherListening == null) db.player.togetherListening = false;
+  if (db.player.autoNext == null) db.player.autoNext = false;
+  if (db.listeningSession == null) db.listeningSession = null;
+  if (!db.musicTasteProfile || typeof db.musicTasteProfile !== 'object') db.musicTasteProfile = def.musicTasteProfile;
+  if (!Array.isArray(db.listeningHistory)) db.listeningHistory = [];
   if (!db.appearance) db.appearance = def.appearance;
   if (db.appearance.fontEn == null) db.appearance.fontEn = def.appearance.fontEn;
   if (!db.profile) db.profile = def.profile;
@@ -718,6 +750,10 @@ function loadDB() {
   if (!Array.isArray(db.ai.notifications)) db.ai.notifications = [];
   if (!db.ai.permissions) db.ai.permissions = def.ai.permissions;
   if (!db.ai._asked) db.ai._asked = {};
+  if (!db.memorySettings) db.memorySettings = def.memorySettings;
+  if (db.memorySettings.enabled == null) db.memorySettings.enabled = true;
+  if (db.memorySettings.autoSaveEnabled == null) db.memorySettings.autoSaveEnabled = true;
+  if (!db.memorySettings.confirmationMode) db.memorySettings.confirmationMode = 'ask_before_save';
   if (!Array.isArray(db.shoppingLists)) db.shoppingLists = def.shoppingLists;
   if (!Array.isArray(db.shoppingItems)) db.shoppingItems = [];
   if (!Array.isArray(db.journal)) db.journal = [];
@@ -1062,6 +1098,7 @@ function afterRender(r) {
   if (r === '/health') { drawHealthCharts(); }
   if (r === '/statistics') { drawStatCharts(); }
   if (r === '/calendar') { bindCalendar(); }
+  if (r === '/finance') { loadFinanceComment(); }
   if (r === '/settings/mcp') { loadMcp(); }
   if (r === '/settings/api') { openApiFill(); }
   if (r === '/settings/notifications') { loadBarkStatus(); }
@@ -1198,27 +1235,17 @@ function viewToday() {
   const todays = tasksOn(todayStr());
   const done = todays.filter((t) => t.completed).length;
   const pct = todays.length ? Math.round(done / todays.length * 100) : 0;
-  const upcoming = DB.tasks.filter((t) => !t.completed && t.date > todayStr()).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 6);
   let html = aiCompanionHeader() + weatherSectionHtml() +
     '<div class="row" style="margin-bottom:18px;gap:14px">' +
     '<div class="avatar" style="width:48px;height:48px;font-size:22px;display:flex;align-items:center;justify-content:center;' + (DB.profile.avatar ? 'background-image:url(' + DB.profile.avatar + ')' : '') + '">' + (DB.profile.avatar ? '' : '🐰') + '</div>' +
     '<div><div class="h1">' + esc(greeting()) + ', ' + esc(name) + '</div><div class="muted">' + esc(todayLong()) + '</div></div></div>';
 
-  // 今日任务：仅概要入口，点击进入独立 Task 页（需求 1）
+  // 需求 17：首页 = Today（问候/天气）+ Task（今日任务概要）而已；其余 Task/Habit/Plan/Note 都有独立页面，不再在首页重复堆叠
   html += '<div class="card card-pad" style="margin-bottom:14px;cursor:pointer" onclick="OS.go(\'/tasks\')">' +
     '<div class="spread" style="margin-bottom:10px"><div class="row" style="gap:8px"><span style="font-size:20px">✅</span><div style="font-size:16px;font-weight:700">今日任务</div></div><div class="muted">' + done + ' / ' + todays.length + ' 完成 ›</div></div>' +
     '<div class="progress"><span style="width:' + pct + '%"></span></div>' +
     (todays.length ? '<div class="muted" style="font-size:12px;margin-top:10px">' + todays.slice(0, 3).map((t) => (t.completed ? '✓ ' : '○ ') + esc(t.title)).join(' · ') + (todays.length > 3 ? ' …' : '') + '</div>' : '<div class="muted" style="font-size:12px;margin-top:10px">今天没有任务，点此安排</div>') +
     '</div>';
-
-  // Upcoming
-  html += '<div class="section-head"><h2>Upcoming</h2><button class="more" onclick="OS.go(\'/calendar\')">日历 ›</button></div>';
-  if (upcoming.length === 0) html += '<div class="card card-pad empty" style="padding:20px"><div class="esub">没有即将到来的任务</div></div>';
-  else html += '<div class="card card-pad" style="padding:8px 10px">' + upcoming.map((t) => '<div class="task-row" onclick="openTaskModal(null,\'' + t.id + '\')"><span class="chk" onclick="event.stopPropagation();toggleTask(\'' + t.id + '\')"></span><span class="prio ' + (t.priority || 'none') + '" style="background:' + (PRIO[t.priority] || PRIO.none).color + '"></span><div class="grow"><div class="t-title">' + esc(t.title) + '</div></div><span class="chip">' + esc(fmtDateHuman(t.date)) + '</span></div>').join('') + '</div>';
-
-  // Habits snapshot
-  html += '<div class="section-head"><h2>今日习惯</h2><button class="more" onclick="OS.go(\'/habit\')">全部 ›</button></div>';
-  html += '<div class="card card-pad" style="padding:8px 10px">' + DB.habits.slice(0, 5).map((h) => habitRowHtml(h, todayStr())).join('') + '</div>';
   return html;
 }
 // 独立任务页（需求 1/8）：今日 / 未来 / 已完成 三种视图，创建/编辑/删除/完成，独立于首页
@@ -1938,11 +1965,10 @@ function viewStatistics() {
   const planPct = plans.length ? Math.round(plans.reduce((s, p) => s + planProgress(p), 0) / plans.length) : 0;
   let html = '<div class="h1" style="margin-bottom:16px">Statistics</div>';
   html += '<div class="spread" style="margin-bottom:16px"><div class="seg">' + rangeBtn(7, '7 天', r) + rangeBtn(30, '30 天', r) + rangeBtn(90, '90 天', r) + '</div></div>';
-  html += '<div class="grid cols-4" style="margin-bottom:16px">' +
-    '<div class="card stat-card"><div class="l">Weekly Progress</div><div class="v">' + taskPct + '%</div><div class="progress" style="margin-top:8px"><span style="width:' + taskPct + '%"></span></div></div>' +
-    '<div class="card stat-card"><div class="l">Completed Tasks</div><div class="v">' + done + ' / ' + tasks.length + '</div><div class="u">完成率 ' + taskPct + '%</div></div>' +
-    '<div class="card stat-card"><div class="l">Habit Completion</div><div class="v">' + habitPct + '%</div><div class="u">今日 ' + habitDone + '/' + habitTotal + '</div></div>' +
-    '<div class="card stat-card"><div class="l">Plan Completion</div><div class="v">' + planPct + '%</div><div class="u">' + plans.length + ' 个计划</div></div></div>';
+  html += '<div class="grid cols-3" style="margin-bottom:16px">' +
+    '<div class="card stat-card"><div class="l">任务完成率</div><div class="v">' + taskPct + '%</div><div class="u">' + done + ' / ' + tasks.length + ' 已完成</div><div class="progress" style="margin-top:10px"><span style="width:' + taskPct + '%"></span></div></div>' +
+    '<div class="card stat-card"><div class="l">习惯完成率</div><div class="v">' + habitPct + '%</div><div class="u">今日 ' + habitDone + '/' + habitTotal + '</div><div class="progress" style="margin-top:10px"><span style="width:' + habitPct + '%"></span></div></div>' +
+    '<div class="card stat-card"><div class="l">计划完成率</div><div class="v">' + planPct + '%</div><div class="u">' + plans.length + ' 个计划</div><div class="progress" style="margin-top:10px"><span style="width:' + planPct + '%"></span></div></div></div>';
   html += '<div class="grid cols-2"><div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">任务完成趋势</div><div id="stLine"></div></div><div class="card chart-wrap"><div style="font-weight:700;font-size:14px;margin-bottom:8px">各类完成度</div><div id="stDonut" style="display:flex;align-items:center;justify-content:center;gap:16px"></div></div></div>';
   return html;
 }
@@ -1965,12 +1991,44 @@ let playerTimer = null;
 let musicAudio = null, musicAudioSrc = '', _musicResults = [], _neteaseUser = null, _neteasePlaylists = [], _qrKey = '', _qrTimer = null;
 function fmtTime(s) { s = Math.max(0, Math.floor(s)); return pad(Math.floor(s / 60)) + ':' + pad(s % 60); }
 function currentTrackIsReal() { const t = currentTrack(); return !!(t && t.url); }
+// 播放队列语义（与后端 lib/music-queue.js 同一套规则）：
+//   播放/切换歌单 = 替换队列；加入队列 = 追加；播放歌曲 = 已在队列则切到该曲，否则追加播放。
+// 判重统一用网易云 songId（t.id），绝不按歌名。
+function songKey(t) { const id = t && (t.id != null ? t.id : t.songId); return id == null || id === '' ? null : String(id); }
+function toTrack(s) { return { id: s.id, title: s.name || s.title || '', artist: s.artist || '', cover: s.cover || '', duration: s.duration || 0, url: null }; }
+function dedupeSongs(songs) {
+  const seen = new Set(); const out = [];
+  for (const s of songs || []) {
+    const k = songKey(s);
+    if (k != null) { if (seen.has(k)) continue; seen.add(k); }
+    out.push(s);
+  }
+  return out;
+}
+// 停止旧音频并清空 src，避免旧歌曲的 ended/timeupdate 事件继续影响新歌曲。
+function stopAudio() {
+  if (musicAudio) { try { musicAudio.pause(); musicAudio.removeAttribute('src'); musicAudio.load(); } catch (e) {} }
+  musicAudioSrc = '';
+}
+// 取一首歌的真实播放地址。返回 { ok, url, code }；code 用于区分登录失效/无版权/网络错误。
+async function fetchTrackUrl(t) {
+  if (!t.id) return { ok: true, url: null }; // 本地曲目无需 URL
+  const r = await apiJson('/api/music/song-url?id=' + encodeURIComponent(t.id));
+  if (!r.ok) return { ok: false, code: r.code || 'SONG_URL_FAILED', url: null };
+  return { ok: true, url: (r.data && r.data.url) || null };
+}
+// 网易云登录失效：清空登录态与歌单缓存，绝不继续用旧 playlist / 旧播放数据。
+function handleNeteaseExpired() {
+  _neteaseUser = null; _neteasePlaylists = [];
+  toast('网易云音乐登录已失效，请重新登录', true);
+  render();
+}
 function ensureAudio() {
   if (!musicAudio) {
     musicAudio = new Audio();
     musicAudio.preload = 'auto';
     musicAudio.addEventListener('timeupdate', () => { if (!isNaN(musicAudio.currentTime)) { DB.player.currentTime = musicAudio.currentTime; playerUpdateProgressUI(); } });
-    musicAudio.addEventListener('ended', () => { playerNext(); });
+    musicAudio.addEventListener('ended', () => { playerAutoAdvance(); });
   }
   musicAudio.volume = DB.player.volume || 0.8;
   return musicAudio;
@@ -2048,7 +2106,7 @@ function playerTick() {
   const p = DB.player; const track = p.playlist[p.current]; if (!track) return;
   p.currentTime = Math.min(track.duration || 0, p.currentTime + 1);
   playerUpdateProgressUI();
-  if (p.currentTime >= track.duration) playerNext();
+  if (p.currentTime >= track.duration) playerAutoAdvance();
 }
 function playerSyncTimer() { clearInterval(playerTimer); playerTimer = null; const t = currentTrack(); if (DB.player.playing && t && !t.url) playerTimer = setInterval(playerTick, 1000); }
 function playerPlayPause() {
@@ -2061,22 +2119,67 @@ function playerPlayPause() {
   playerSyncTimer(); saveDB(); render(); playerUpdateSheetUI();
   AIBus.emit({ type: DB.player.playing ? 'MUSIC_PLAY' : 'MUSIC_PAUSE', entityType: 'music' });
 }
-function toggleTogether() {
-  DB.player.togetherListening = !DB.player.togetherListening;
+async function toggleTogether() {
+  const turning = !DB.player.togetherListening;
+  if (turning) {
+    try {
+      const r = await fetch(API_BASE + '/api/listening/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoNext: !!DB.player.autoNext, companionEnabled: true }) });
+      const j = await r.json();
+      if (j && j.success) {
+        DB.player.togetherListening = true;
+        DB.listeningSession = (j.data && j.data.session) || DB.listeningSession;
+        toast('♥ 一起听'); aiLogActivity('music', '开启了「一起听」');
+      } else {
+        toast((j && j.error && j.error.message) || '开启失败', true);
+      }
+    } catch (e) { toast('开启失败（后端不可达）', true); }
+  } else {
+    try {
+      await fetch(API_BASE + '/api/listening/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    } catch (e) { /* 后端不可达也照常本地结束 */ }
+    DB.player.togetherListening = false;
+    if (DB.listeningSession && typeof DB.listeningSession === 'object') DB.listeningSession.status = 'ended';
+    toast('已退出一起听');
+  }
   saveDB(); render();
-  if (DB.player.togetherListening) { toast('♥ 一起听'); aiLogActivity('music', '开启了「一起听」'); }
-  else toast('已退出一起听');
+}
+
+// 歌曲结束：自动接歌（陪听会话 + autoNext）时由后端 AI 推荐下一首；失败/未开启则走播放列表下一首，绝不中断播放
+async function playerAutoAdvance() {
+  if (DB.player.autoNext && DB.player.togetherListening) {
+    try {
+      const r = await fetch(API_BASE + '/api/listening/recommend-next', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await r.json();
+      const song = j && j.data && j.data.song;
+      if (song && song.id) {
+        let idx = DB.player.playlist.findIndex((t) => String(t.id) === String(song.id));
+        if (idx < 0) {
+          DB.player.playlist.push({ id: song.id, title: song.name || song.title || '', artist: song.artist || '', cover: song.cover || '', duration: song.duration || 0, url: null });
+          idx = DB.player.playlist.length - 1;
+        }
+        playTrack(idx, true);
+        return;
+      }
+    } catch (e) { /* AI 推荐失败 → 降级播放列表下一首 */ }
+  }
+  playerNext();
 }
 async function playTrack(i, autoplay) {
   const p = DB.player; const t = p.playlist[i]; if (!t) return;
+  stopAudio(); // 切歌：先停旧音频，清除旧播放状态，避免 ended/timeupdate 影响新歌曲
   if (t.id && !t.url) {
-    try {
-      const r = await fetch(API_BASE + '/api/music/song-url?id=' + t.id);
-      const j = await r.json();
-      t.url = (j.data && j.data.url) || null;
-      if (!t.url) toast('⚠️ 这首歌暂无播放源（可能需登录/VIP）');
-      saveDB();
-    } catch (e) {}
+    const got = await fetchTrackUrl(t);
+    if (!got.ok || !got.url) {
+      // 拿不到真实播放地址：绝不进入「正在播放但实际上没有 src」的假状态
+      t.url = null;
+      p.current = i; p.currentTime = 0; p.playing = false;
+      if (got.code === 'NETEASE_AUTH_EXPIRED') handleNeteaseExpired();
+      else if (got.code === 'SONG_NOT_PLAYABLE') toast('⚠️ 这首歌当前无法播放（可能无版权/VIP）', true);
+      else if (got.code === 'SONG_URL_FAILED' || got.code === 'NETEASE_NETWORK_ERROR') toast('⚠️ 无法获取播放地址，请稍后再试', true);
+      else toast('⚠️ 这首歌暂无播放源', true);
+      saveDB(); render(); refreshPlayerSheetIfOpen(); return;
+    }
+    t.url = got.url; saveDB();
   }
   p.current = i; p.currentTime = 0; p.playing = autoplay;
   t.playCount = (t.playCount || 0) + 1; // 长期收听模式计数（供 AI 判断价值，需求 19）
@@ -2110,29 +2213,48 @@ async function musicSearch() {
     const songs = (await r.json()).data || [];
     _musicResults = songs;
     if (!songs.length) { box.innerHTML = '<div class="muted" style="padding:8px">没有结果</div>'; return; }
-    box.innerHTML = songs.map((s, i) => '<div class="conv-item" onclick="musicAddFromResult(' + i + ')"><div style="width:38px;height:38px;border-radius:8px;' + (s.cover ? 'background-image:url(' + s.cover + ');background-size:cover;background-position:center;' : 'background:linear-gradient(135deg,#6b8cae,#8b5cf6);') + 'display:flex;align-items:center;justify-content:center">' + (s.cover ? '' : '🎵') + '</div><div class="grow"><div style="font-weight:600">' + esc(s.name) + '</div><div class="c-last">' + esc(s.artist) + (s.album ? ' · ' + esc(s.album) : '') + '</div></div><span class="muted">' + fmtTime(s.duration) + '</span></div>').join('');
+    box.innerHTML = songs.map((s, i) => '<div class="conv-item" onclick="musicPlayFromResult(' + i + ')"><div style="width:38px;height:38px;border-radius:8px;' + (s.cover ? 'background-image:url(' + s.cover + ');background-size:cover;background-position:center;' : 'background:linear-gradient(135deg,#6b8cae,#8b5cf6);') + 'display:flex;align-items:center;justify-content:center">' + (s.cover ? '' : '🎵') + '</div><div class="grow"><div style="font-weight:600">' + esc(s.name) + '</div><div class="c-last">' + esc(s.artist) + (s.album ? ' · ' + esc(s.album) : '') + '</div></div><button class="btn btn-sm" style="flex-shrink:0" onclick="event.stopPropagation();musicQueueFromResult(' + i + ')">＋队列</button><span class="muted" style="margin-left:6px">' + fmtTime(s.duration) + '</span></div>').join('');
   } catch (e) { box.innerHTML = '<div class="muted" style="padding:8px">搜索失败：' + esc(e.message) + '</div>'; }
 }
-function musicAddFromResult(i) { const s = _musicResults[i]; if (s) { musicAddSong(s); closeModal(); } }
-function musicAddSong(s) {
-  const track = { id: s.id, title: s.name, artist: s.artist, cover: s.cover, duration: s.duration, url: null };
-  DB.player.playlist.push(track);
-  const idx = DB.player.playlist.length - 1;
+function musicPlayFromResult(i) { const s = _musicResults[i]; if (s) { musicPlaySong(s); closeModal(); } }
+function musicQueueFromResult(i) { const s = _musicResults[i]; if (s) musicAddToQueue(s); }
+// 播放歌曲：已在队列则切到该曲；否则追加并播放。绝不无意义重复添加。
+function musicPlaySong(s) {
+  const track = toTrack(s);
+  const p = DB.player;
+  const k = songKey(track);
+  let idx = k != null ? p.playlist.findIndex((t) => songKey(t) === k) : -1;
+  if (idx < 0) { p.playlist.push(track); idx = p.playlist.length - 1; }
   saveDB();
-  fetch(API_BASE + '/api/music/song-url?id=' + s.id).then(r => r.json()).then(j => {
-    track.url = (j.data && j.data.url) || null;
-    if (!track.url) toast('⚠️ 暂无播放源（可能需登录/VIP）');
-    saveDB();
-  }).catch(() => {}).finally(() => playTrack(idx, true));
+  playTrack(idx, true);
 }
-async function musicAddPlaylist(id) {
-  try {
-    const r = await fetch(API_BASE + '/api/music/playlist?id=' + id);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const songs = (await r.json()).data || [];
-    songs.forEach((s) => DB.player.playlist.push({ id: s.id, title: s.name, artist: s.artist, cover: s.cover, duration: s.duration, url: null }));
-    saveDB(); render(); toast('已加入 ' + songs.length + ' 首');
-  } catch (e) { toast('获取歌单失败：' + e.message, true); }
+// 加入队列：追加 + 按 songId 去重，不改变当前正在播放的歌曲。
+function musicAddToQueue(s) {
+  const track = toTrack(s);
+  const p = DB.player;
+  const k = songKey(track);
+  if (k != null && p.playlist.some((t) => songKey(t) === k)) { toast('已在播放列表'); return; }
+  p.playlist.push(track);
+  saveDB(); render(); toast('已加入队列：' + track.title);
+}
+// 播放/切换歌单：完全替换队列（不是追加）。新歌单 → 新队列 → 去重 → current=0 → 播放第一首。
+async function musicPlayPlaylist(id) {
+  const pr = await apiJson('/api/music/playlist?id=' + encodeURIComponent(id));
+  if (!pr.ok) {
+    if (pr.code === 'NETEASE_AUTH_EXPIRED') handleNeteaseExpired();
+    else toast('获取歌单失败：' + (pr.message || pr.err || '未知错误'), true);
+    return;
+  }
+  const songs = pr.data || [];
+  if (!songs.length) { toast('歌单为空', true); return; }
+  stopAudio(); // 停止旧音频，清除旧播放状态
+  DB.player.playlist = dedupeSongs(songs.map(toTrack)); // 新队列替换旧队列
+  DB.player.current = 0;
+  DB.player.currentTime = 0;
+  DB.player.playing = false;
+  saveDB();
+  playTrack(0, true);
+  toast('播放歌单（' + DB.player.playlist.length + ' 首）');
 }
 // 安全请求后端 JSON：区分「后端不可达 / 返回非 JSON（被 CDN 回退成 HTML）/ HTTP 错误 / 正常」。
 // 避免直接 r.json() 在返回 HTML 时抛「The string did not match the expected pattern」这类解析错误。
@@ -2143,8 +2265,16 @@ async function apiJson(path, opts) {
   const ct = r.headers.get('content-type') || '';
   if (!r.ok) {
     let msg = 'HTTP ' + r.status;
-    try { const j = await r.json(); if (j && (j.error || j.message)) msg = j.error || j.message; } catch (e) {}
-    return { ok: false, err: 'http', status: r.status, message: msg };
+    let code = null;
+    try {
+      const j = await r.json();
+      const e = j && (j.error !== undefined ? j.error : j.message);
+      if (e) {
+        if (typeof e === 'string') msg = e;
+        else { msg = e.message || String(e); code = e.code || null; }
+      }
+    } catch (e) {}
+    return { ok: false, err: 'http', status: r.status, code, message: msg };
   }
   if (ct.indexOf('application/json') === -1) return { ok: false, err: 'not-json', message: '服务响应异常' };
   try { return { ok: true, data: (await r.json()).data }; }
@@ -2152,7 +2282,7 @@ async function apiJson(path, opts) {
 }
 async function musicLoginModal() {
   if (_neteaseUser) {
-    const rows = (_neteasePlaylists || []).map((pl) => '<div class="conv-item" onclick="OS.closeModal();musicAddPlaylist(' + pl.id + ')"><div class="grow"><div style="font-weight:600">' + esc(pl.name) + '</div><div class="c-last">' + pl.count + ' 首</div></div></div>').join('');
+    const rows = (_neteasePlaylists || []).map((pl) => '<div class="conv-item" onclick="OS.closeModal();musicPlayPlaylist(' + pl.id + ')"><div class="grow"><div style="font-weight:600">' + esc(pl.name) + '</div><div class="c-last">' + pl.count + ' 首 · 点击播放（替换当前列表）</div></div></div>').join('');
     modal('<div class="modal-head"><h3>网易云 · ' + esc(_neteaseUser.nickname) + '</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body">' + (rows || '<div class="muted">暂无歌单</div>') + '</div><div class="modal-foot"><button class="btn" onclick="musicLogout()">退出登录</button></div>');
     return;
   }
@@ -2190,14 +2320,24 @@ async function musicQrPoll(key) {
 async function musicRefreshStatus() {
   const r = await apiJson('/api/music/status');
   if (!r.ok) return;
-  const u = r.data || null;
-  const changed = (!!u !== !!_neteaseUser) || (u && _neteaseUser && u.userId !== _neteaseUser.userId);
-  _neteaseUser = u;
-  if (u) {
-    const pr = await apiJson('/api/music/playlists');
-    _neteasePlaylists = pr.ok ? (pr.data || []) : [];
-  } else _neteasePlaylists = [];
-  if (changed) render();
+  const st = r.data || { status: 'not_logged_in' };
+  // 登录已失效：清空登录态与歌单缓存，绝不继续用旧 playlist / 旧播放数据
+  if (st.status === 'expired') { handleNeteaseExpired(); return; }
+  if (st.status !== 'logged_in') { _neteaseUser = null; _neteasePlaylists = []; return; }
+  const prevUserId = _neteaseUser ? _neteaseUser.userId : null;
+  const user = { userId: st.userId, nickname: st.nickname, avatarUrl: st.avatarUrl };
+  const changed = (prevUserId !== user.userId);
+  _neteaseUser = user;
+  const pr = await apiJson('/api/music/playlists');
+  _neteasePlaylists = pr.ok ? (pr.data || []) : [];
+  if (changed) {
+    // 换了网易云账号：清空旧账号下缓存的播放地址，避免 VIP/版权 URL 串号污染新账号队列
+    if (prevUserId != null) {
+      (DB.player.playlist || []).forEach((t) => { if (t.id) t.url = null; });
+      saveDB();
+    }
+    render();
+  }
 }
 async function musicLogout() {
   try { await fetch(API_BASE + '/api/music/logout', { method: 'POST' }); } catch (e) {}
@@ -2904,44 +3044,56 @@ function viewChat() {
   const s = aiSet();
   const cur = OS.chat.sessions.find((x) => x.id === OS.chat.currentId);
   const title = cur ? cur.name : '新的对话';
+  const a = OS.chat.currentAssistant();
+  const av = (a && (a.avatar || a.avatarUrl)) || '';
   const bg = s.chatBackground;
   let bgStyle = '';
   if (bg && bg.type === 'solid' && bg.color) bgStyle = 'background:' + bg.color;
   else if (bg && bg.type === 'image' && bg.url) bgStyle = 'background-image:url(' + bg.url + ')';
   return '<div class="chat-scrim" id="chatScrim" onclick="OS.chat.toggleSidebar(false)"></div>' +
     '<div class="chat-sidebar" id="chatSidebar">' +
-    '<button class="btn btn-sm btn-primary" style="width:100%;margin-bottom:10px" onclick="OS.chat.newChat()">＋ 新对话</button>' +
-    '<div class="session-list" id="chatSessions"></div>' +
+    '<div class="spread" style="align-items:center;margin-bottom:10px">' +
+    '<button class="btn btn-sm btn-primary" style="flex:1" onclick="OS.chat.newChat()">＋ 新对话</button>' +
+    '<button class="icon-btn" style="width:32px;height:32px;margin-left:8px" onclick="OS.chat.toggleSidebar(false)" title="关闭">✕</button>' +
     '</div>' +
-    '<div class="chat-stage" style="height:100dvh;overflow:hidden">' +
+    '<div class="search-box" style="margin-bottom:10px"><span class="sico">🔍</span><input class="input" id="chatSessionSearch" placeholder="搜索对话" style="padding-left:34px" oninput="OS.chat.renderSessions()"></div>' +
+    '<div class="session-list" id="chatSessions" style="flex:1;overflow-y:auto"></div>' +
+    '<div id="chatMultiBar"></div>' +
+    '</div>' +
+    '<div class="chat-stage">' +
     (bgStyle ? '<div class="chat-bg" style="' + bgStyle + '"></div>' : '') +
     '<div class="chat-bg-overlay"></div>' +
-    // 顶部：[☰] [头像] 标题 [⋯]（需求 6：只保留这三个元素，模型选择并入 ⋯ 菜单；safe-area 顶部不被刘海遮挡）
-    '<div style="display:flex;align-items:center;gap:8px;padding:max(8px, env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid var(--border)">' +
+    // 顶部：[☰] 标题（可点击重命名）····· [🗺 地图] [当前助手头像]
+    '<div class="chat-header" style="display:flex;align-items:center;gap:8px;padding:max(8px, env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid var(--border)">' +
     '<button class="icon-btn" onclick="OS.chat.toggleSidebar()" title="会话列表">☰</button>' +
-    '<div class="avatar" style="width:30px;height:30px;font-size:14px;flex-shrink:0;' + (s.assistantAvatar ? 'background-image:url(' + s.assistantAvatar + ')' : '') + '" onclick="OS.chat.assistantMenu(event)">' + (s.assistantAvatar ? '' : '♥') + '</div>' +
-    '<div class="grow" style="min-width:0;cursor:pointer" onclick="OS.chat.assistantMenu(event)" title="切换 AI 助手">' +
-    '<div id="chatTitle" style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(title) + '</div>' +
-    '<div class="muted" style="font-size:11px">' + esc(s.aiName || '♥ 我的AI') + ' <span style="opacity:.6">▾</span></div></div>' +
-    '<button class="icon-btn" onclick="OS.chat.topMenu(event)" title="模型 / 会话操作">⋯</button>' +
+    '<div class="grow" style="min-width:0">' +
+    '<div id="chatTitle" class="chat-title" style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="OS.chat.renameSession(OS.chat.currentId)" title="点击重命名">' + esc(title) + '</div>' +
+    '<div id="chatSub" class="muted" style="font-size:11px">' + esc((a && a.name) || s.aiName || '♥ 我的AI') + ' · ' + esc((a && a.model) || s.model || '') + '</div></div>' +
+    '<button class="icon-btn" onclick="openMiniMap()" title="地图">🗺</button>' +
+    '<div class="avatar" id="chatAssistantAvatar" style="width:32px;height:32px;font-size:15px;flex-shrink:0;' + (av ? 'background-image:url(' + av + ')' : '') + '" onclick="OS.chat.assistantPicker()" title="切换 AI 助手">' + (av ? '' : '♥') + '</div>' +
+    '<button class="icon-btn" onclick="OS.chat.topMenu(event)" title="会话 / 模型">⋯</button>' +
     '</div>' +
-    // 消息区（单列，去掉会挤压气泡的侧栏）
-    '<div style="flex:1;display:flex;flex-direction:column;min-width:0">' +
+    // 消息区（单列，覆盖式侧栏不挤压气泡）
+    '<div class="chat-body">' +
     '<div id="chatAttach" style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border)"></div>' +
-    '<div id="chatMsgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px"><div class="muted" style="text-align:center;margin:auto">正在连接 AI…</div></div>' +
+    '<div style="flex:1;min-height:0;position:relative;display:flex">' +
+    '<div id="chatMsgs" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:8px" onscroll="OS.chat.updateScrollTop()"><div class="muted" style="text-align:center;margin:auto">正在连接 AI…</div></div>' +
+    '<button class="chat-scroll-top" id="chatScrollTop" onclick="OS.chat.scrollToBottom(true)">↓</button>' +
     '</div>' +
-    // 引用动态卡片 + 输入栏
-    '<div>' +
+    '</div>' +
+    // 引用动态卡片 + 编辑提示条 + composer
+    '<div style="flex-shrink:0">' +
+    '<div id="chatEditBar" style="padding:0 14px"></div>' +
     OS.chat.quoteCardHtml() +
     '<div class="chat-input-bar">' +
-    '<button class="icon-btn" onclick="document.getElementById(\'chatFile\').click()">📎</button>' +
+    '<button class="composer-btn" id="chatPlus" onclick="OS.chat.composerMenu(event)" title="更多">＋</button>' +
     '<input type="file" id="chatFile" accept="image/*,.txt,.pdf,.doc,.docx,.xls,.xlsx,.pptx" multiple style="display:none" onchange="OS.chat.onFiles(this)">' +
-    '<textarea id="chatInput" class="chat-input" rows="1" placeholder="输入消息与 AI 聊天…" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();OS.chat.send()}"></textarea>' +
-    '<button class="btn btn-primary" id="chatSend" onclick="OS.chat.send()">发送</button>' +
+    '<textarea id="chatInput" class="chat-input" rows="1" placeholder="输入消息与 AI 聊天…" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();OS.chat.sendOrStop()}" oninput="OS.chat.autoGrow(this);OS.chat.saveDraft()"></textarea>' +
+    '<button class="composer-btn send" id="chatSend" onclick="OS.chat.sendOrStop()" title="发送">↑</button>' +
     '</div>' +
     '</div></div>';
 }
-function chatMapMessage(m) { const usage = (m.metadata && m.metadata.usage) || {}; return { id: m.id, role: m.role, content: m.content || '', time: m.created_at ? new Date(m.created_at).toLocaleString() : '', tokens: usage.total_tokens, quotedDynamic: (m.metadata && m.metadata.quotedDynamic) || null }; }
+function chatMapMessage(m) { const usage = (m.metadata && m.metadata.usage) || {}; return { id: m.id, role: m.role, content: m.content || '', time: m.created_at ? new Date(m.created_at).toLocaleString() : '', tokens: usage.total_tokens, quotedDynamic: (m.metadata && m.metadata.quotedDynamic) || null, attachments: (m.metadata && m.metadata.attachments) || [] }; }
 function chatBubbleHtml(msg, isLast) {
   const s = aiSet();
   const isUser = msg.role === 'user';
@@ -2954,18 +3106,130 @@ function chatBubbleHtml(msg, isLast) {
   // 引用 AI 动态（需求 33）：消息 metadata.quotedDynamic
   const qd = msg.quotedDynamic;
   const quote = qd ? '<div class="quote-card" style="margin:0 0 6px"><span style="flex-shrink:0">↳</span><div class="q-body">引用动态 · ' + esc(String(qd.content || '')) + '</div></div>' : '';
+  // 附件（图片缩略图 / 文件 chip），图片点击放大、文件点击下载/预览
+  let attachHtml = '';
+  if (msg.attachments && msg.attachments.length) {
+    attachHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">' + msg.attachments.map((a) => {
+      const u = a.dataUrl || (a.fileUrl ? (String(a.fileUrl).startsWith('http') ? a.fileUrl : API_BASE + a.fileUrl) : (a.publicUrl || ''));
+      const isImg = (a.mimeType || '').startsWith('image/') || !!a.dataUrl || /\.(png|jpe?g|webp|gif)$/i.test(a.fileName || '');
+      if (isImg && u) return '<img src="' + u + '" onclick="OS.chat.previewImage(\'' + String(u).replace(/'/g, '\\\'') + '\')" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:zoom-in;flex-shrink:0">';
+      return '<div onclick="OS.chat.previewFile(\'' + (u ? String(u).replace(/'/g, '\\\'') : '') + '\',\'' + esc(a.fileName || a.name || '文件') + '\')" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.5);font-size:12px;cursor:pointer;max-width:220px"><span>📄</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.fileName || a.name || '文件') + '</span></div>';
+    }).join('') + '</div>';
+  }
   // 需求 5：点击气泡才出现轻量操作菜单（不再常驻 hover，也不改变气泡本身）
-  const clickable = msg.id && msg.content && !msg.thinking && !msg.error && !msg.pendingUser;
+  const clickable = msg.id && (msg.content || (msg.attachments && msg.attachments.length)) && !msg.thinking && !msg.error && !msg.pendingUser;
   return '<div class="chat-msg-row" style="display:flex;' + (isUser ? 'flex-direction:row-reverse' : '') + ';gap:8px;align-items:flex-start">' +
     '<div class="avatar" style="width:30px;height:30px;flex-shrink:0;' + (avatar ? 'background-image:url(' + avatar + ')' : '') + '">' + (avatar ? '' : (isUser ? '🙂' : '♥')) + '</div>' +
     '<div style="max-width:86%;min-width:0"><div class="muted" style="font-size:10px;margin-bottom:2px">' + esc(name) + (msg.time ? ' · ' + esc(msg.time) : '') + '</div>' +
     quote +
+    attachHtml +
     '<div class="bubble ' + (isUser ? 'out' : 'in') + '" style="--bubble-alpha:' + (s.bubbleOpacity || 0.9) + ';cursor:' + (clickable ? 'pointer' : 'default') + '"' + (clickable ? ' onclick="OS.chat.bubbleMenu(event,\'' + msg.id + '\')" ontouchstart="OS.chat.bubblePressStart(event,\'' + msg.id + '\')" ontouchmove="OS.chat.bubblePressMove()" ontouchend="OS.chat.bubblePressEnd()" ontouchcancel="OS.chat.bubblePressEnd()"' : '') + '>' + bubble + '</div></div></div>';
 }
 OS.chat.loaded = false;
+OS.chat.attachments = []; // 待发送附件（上传状态：uploading / done / error）
 OS.chat.quotedDynamic = null; // 引用 AI 动态（需求 33）：{ id, type:'ai_dynamic', content, createdAt }
+OS.chat.editingId = null; // 正在编辑的用户消息 id（内容已回填到输入框，发送时走编辑接口，需求 3）
+OS.chat.multiSelect = false; // 会话多选模式（需求 1）
+OS.chat.multiSelected = {};
 OS.chat.sidebarOpen = false;
+OS.chat.isGenerating = false; // 是否正在生成回复（决定发送按钮 → 停止按钮）
+OS.chat.abortCtrl = null;     // 当前流式/非流式请求的 AbortController
+OS.chat.drafts = {};          // 每会话输入草稿 { [sessionId]: string }（localStorage 持久化，非正式消息）
 let _chatLongPress = 0;
+
+// 当前会话（不存在则 null）
+OS.chat.chatSession = function() { return (OS.chat.sessions || []).find((x) => x.id === OS.chat.currentId) || null; };
+// 当前会话绑定的助手：优先 conversation.assistant_id，回退全局 activeAssistantId，最后兜底第一个助手（仅数据修复）
+OS.chat.currentAssistant = function() {
+  const list = ensureAssistants();
+  const cur = OS.chat.chatSession();
+  const aid = (cur && cur.assistant_id) || DB.activeAssistantId;
+  return list.find((x) => x.id === aid) || list[0] || null;
+};
+// 草稿：localStorage 持久化，切换/刷新可恢复；绝不写入 Memory、绝不当正式消息
+function chatDraftsLoad() { try { OS.chat.drafts = JSON.parse(localStorage.getItem('bunny_chat_drafts') || '{}') || {}; } catch (e) { OS.chat.drafts = {}; } }
+function chatDraftsSave() { try { localStorage.setItem('bunny_chat_drafts', JSON.stringify(OS.chat.drafts || {})); } catch (e) {} }
+OS.chat.saveDraft = function() { if (!OS.chat.currentId) return; const el = document.getElementById('chatInput'); if (el) OS.chat.drafts[OS.chat.currentId] = el.value; chatDraftsSave(); };
+OS.chat.restoreDraft = function() { const el = document.getElementById('chatInput'); if (!el) return; el.value = OS.chat.drafts[OS.chat.currentId] || ''; OS.chat.autoGrow(el); };
+OS.chat.clearDraft = function(id) { if (id && OS.chat.drafts[id] != null) delete OS.chat.drafts[id]; chatDraftsSave(); };
+// ---- Composer：发送/停止按钮、自动增高、滚动到底、+ 菜单、会话信息 ----
+OS.chat.syncSendButton = function() {
+  const btn = document.getElementById('chatSend');
+  if (!btn) return;
+  if (OS.chat.isGenerating) { btn.textContent = '■'; btn.title = '停止生成'; btn.classList.add('stop'); btn.classList.remove('send'); btn.disabled = false; }
+  else {
+    btn.textContent = '↑'; btn.title = '发送'; btn.classList.add('send'); btn.classList.remove('stop');
+    const input = document.getElementById('chatInput');
+    btn.disabled = !(input && input.value.trim()) && OS.chat.attachments.length === 0;
+  }
+};
+OS.chat.sendOrStop = function() { if (OS.chat.isGenerating) OS.chat.stop(); else OS.chat.send(); };
+OS.chat.stop = function() {
+  if (OS.chat.abortCtrl) { try { OS.chat.abortCtrl.abort(); } catch (e) {} }
+  OS.chat.isGenerating = false;
+  OS.chat.syncSendButton();
+  const last = OS.chat.messages[OS.chat.messages.length - 1];
+  if (last && last.role === 'assistant' && last.thinking && !last.content) { last.thinking = false; last.content = '（已停止生成）'; last.note = true; }
+  OS.chat.renderAll();
+};
+OS.chat.autoGrow = function(el) {
+  if (!el) el = document.getElementById('chatInput');
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 132) + 'px';
+  OS.chat.syncSendButton();
+};
+OS.chat.clearInput = function() {
+  const el = document.getElementById('chatInput');
+  if (el) { el.value = ''; OS.chat.autoGrow(el); OS.chat.saveDraft(); }
+  OS.chat.attachments = []; OS.chat.renderAttach();
+  OS.chat.syncSendButton();
+};
+OS.chat.scrollToBottom = function(smooth) {
+  const msgs = document.getElementById('chatMsgs');
+  if (msgs) msgs.scrollTo({ top: msgs.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+};
+OS.chat.updateScrollTop = function() {
+  const msgs = document.getElementById('chatMsgs');
+  const btn = document.getElementById('chatScrollTop');
+  if (!msgs || !btn) return;
+  const nearBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
+  btn.classList.toggle('show', !nearBottom);
+};
+// 空状态建议：只填入输入框，不自动发送
+OS.chat.suggest = function(text) {
+  const el = document.getElementById('chatInput');
+  if (el) { el.value = text; el.focus(); OS.chat.autoGrow(el); OS.chat.saveDraft(); }
+};
+OS.chat.composerMenu = function(e) {
+  const items = [
+    { label: '上传附件', ico: '📎', fn: 'OS.closeMenu();document.getElementById(\'chatFile\').click()' },
+    { label: '引用 AI 动态', ico: '↳', fn: 'OS.closeMenu();OS.chat.pickDynamic()' },
+    { label: '清空输入', ico: '✕', fn: 'OS.closeMenu();OS.chat.clearInput()' },
+    { label: '会话信息', ico: 'ℹ', fn: 'OS.closeMenu();OS.chat.conversationInfo()' },
+  ];
+  menu(items, e.clientX, e.clientY);
+};
+OS.chat.pickDynamic = function() {
+  const acts = (DB.ai.activities || []).slice(0, 20);
+  if (!acts.length) { toast('暂无 AI 动态可引用', true); return; }
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    '<div class="sheet-head"><div style="font-weight:700;font-size:16px">引用 AI 动态</div></div>' +
+    acts.map((a) => '<button class="sheet-item" onclick="OS.closeModal();OS.chat.quoteDynamic(\'' + a.id + '\')"><span class="ico">' + aiActivityIcon(a.type) + '</span><span class="grow" style="text-align:left;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.text) + '</div><div class="muted" style="font-size:11px">' + relTime(a.time) + '</div></span></button>').join('') +
+    '</div>', 'bottom');
+};
+OS.chat.conversationInfo = function() {
+  const cur = OS.chat.chatSession(); if (!cur) return;
+  const a = OS.chat.currentAssistant();
+  const msgs = OS.chat.messages.filter((m) => m.content);
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    '<div class="sheet-head"><div style="font-weight:700;font-size:16px">会话信息</div></div>' +
+    '<div class="sheet-item" style="cursor:default"><span class="ico">💬</span><span class="grow" style="text-align:left"><div class="muted" style="font-size:11px">标题</div><div>' + esc(cur.name || '新的对话') + '</div></span></div>' +
+    '<div class="sheet-item" style="cursor:default"><span class="ico">♥</span><span class="grow" style="text-align:left"><div class="muted" style="font-size:11px">助手</div><div>' + esc((a && a.name) || '未选择') + (a && a.model ? ' · ' + esc(a.model) : '') + '</div></span></div>' +
+    '<div class="sheet-item" style="cursor:default"><span class="ico">🗨</span><span class="grow" style="text-align:left"><div class="muted" style="font-size:11px">消息数</div><div>' + msgs.length + ' 条</div></span></div>' +
+    '<div class="sheet-item" style="cursor:default"><span class="ico">🕐</span><span class="grow" style="text-align:left"><div class="muted" style="font-size:11px">创建时间</div><div>' + esc(cur.created_at || '') + '</div></span></div>' +
+    '</div>', 'bottom');
+};
 OS.chat.toggleSidebar = function(force) {
   const open = force != null ? force : !OS.chat.sidebarOpen;
   OS.chat.sidebarOpen = open;
@@ -2992,27 +3256,64 @@ OS.chat.quoteDynamic = function(id) {
 };
 OS.chat.renderSessions = function() {
   const el = document.getElementById('chatSessions'); if (!el) return;
-  const sorted = (OS.chat.sessions || []).slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  el.innerHTML = sorted.map((s) => '<div class="session-item' + (s.id === OS.chat.currentId ? ' active' : '') + '" onclick="OS.chat.switch(\'' + s.id + '\')">' +
+  const q = ((document.getElementById('chatSessionSearch') || {}).value || '').trim().toLowerCase();
+  let sorted = (OS.chat.sessions || []).slice();
+  if (q) sorted = sorted.filter((s) => (s.name || '').toLowerCase().indexOf(q) >= 0);
+  sorted = sorted.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  if (OS.chat.multiSelect) {
+    el.innerHTML = sorted.map((s) => '<div class="session-item' + (s.id === OS.chat.currentId ? ' active' : '') + '" onclick="OS.chat.toggleSessionSelect(\'' + s.id + '\')">' +
+      '<span style="flex-shrink:0;font-size:16px">' + (OS.chat.multiSelected[s.id] ? '☑' : '☐') + '</span>' +
+      '<span class="s-name">' + esc(s.name || '未命名') + '</span>' +
+      '</div>').join('');
+    OS.chat.renderMultiBar();
+    return;
+  }
+  el.innerHTML = sorted.map((s) => '<div class="session-item' + (s.id === OS.chat.currentId ? ' active' : '') + '" onclick="OS.chat.switch(\'' + s.id + '\')" ontouchstart="OS.chat.sessionPressStart(event,\'' + s.id + '\')" ontouchmove="OS.chat.sessionPressMove()" ontouchend="OS.chat.sessionPressEnd()" ontouchcancel="OS.chat.sessionPressEnd()">' +
     (s.pinned ? '<span style="flex-shrink:0">📌</span>' : '') +
     '<span class="s-name">' + esc(s.name || '未命名') + '</span>' +
     '<button class="s-menu" onclick="event.stopPropagation();OS.chat.sessionMenu(event,\'' + s.id + '\')">⋯</button>' +
     '</div>').join('');
+  OS.chat.renderMultiBar();
 };
 OS.chat.renderHeader = function() {
-  const el = document.getElementById('chatTitle'); if (!el) return;
+  const el = document.getElementById('chatTitle');
   const cur = OS.chat.sessions.find((x) => x.id === OS.chat.currentId);
-  el.textContent = cur ? cur.name : '新的对话';
+  if (el) el.textContent = (cur && cur.name) ? cur.name : '新的对话';
+  const a = OS.chat.currentAssistant();
+  const av = (a && (a.avatar || a.avatarUrl)) || '';
+  const avatarEl = document.getElementById('chatAssistantAvatar');
+  if (avatarEl) {
+    avatarEl.style.backgroundImage = av ? 'url(' + av + ')' : '';
+    avatarEl.textContent = av ? '' : '♥';
+    avatarEl.title = '切换 AI 助手 · ' + ((a && a.name) || '');
+  }
+  const sub = document.getElementById('chatSub');
+  if (sub) sub.textContent = ((a && a.name) || aiSet().aiName || '♥ 我的AI') + ' · ' + ((a && a.model) || aiSet().model || '');
 };
 OS.chat.renderMessages = function() {
   const el = document.getElementById('chatMsgs'); if (!el) return;
-  if (OS.chat.messages.length === 0) { el.innerHTML = '<div class="empty" style="margin:auto"><div class="eico">♥</div><div class="etitle">你好，我是 ' + esc(aiSet().aiName || 'Bunny') + '</div><div class="esub">今天怎么样？</div></div>'; return; }
+  if (OS.chat.messages.length === 0) {
+    const a = OS.chat.currentAssistant();
+    const name = (a && a.name) || aiSet().aiName || 'Bunny';
+    el.innerHTML = '<div class="empty" style="margin:auto;text-align:center;padding:0 20px"><div class="eico">♥</div>' +
+      '<div class="etitle">你好，我是 ' + esc(name) + '</div><div class="esub">今天怎么样？</div>' +
+      '<div class="chat-suggest">' +
+      '<button class="chip" onclick="OS.chat.suggest(\'写一首关于夏天的诗\')">写一首关于夏天的诗</button>' +
+      '<button class="chip" onclick="OS.chat.suggest(\'帮我制定今天计划\')">帮我制定今天计划</button>' +
+      '<button class="chip" onclick="OS.chat.suggest(\'陪我聊聊天吧\')">陪我聊聊天吧</button>' +
+      '<button class="chip" onclick="OS.chat.suggest(\'整理一下我的记忆\')">整理一下我的记忆</button>' +
+      '</div></div>';
+    OS.chat.updateScrollTop();
+    return;
+  }
   let lastAi = -1; for (let i = OS.chat.messages.length - 1; i >= 0; i--) if (OS.chat.messages[i].role === 'assistant') { lastAi = i; break; }
   el.innerHTML = OS.chat.messages.map((m, i) => chatBubbleHtml(m, i === lastAi)).join('');
   el.scrollTop = el.scrollHeight;
+  OS.chat.updateScrollTop();
 };
 OS.chat.renderAll = function() { OS.chat.renderSessions(); OS.chat.renderMessages(); OS.chat.renderHeader(); OS.chat.syncSidebar(); };
 OS.chat.init = async function() {
+  chatDraftsLoad();
   try {
     const resp = await fetch(API_BASE + '/api/sessions'); if (!resp.ok) throw new Error('HTTP ' + resp.status);
     OS.chat.sessions = (await resp.json()).sessions || [];
@@ -3023,26 +3324,57 @@ OS.chat.init = async function() {
     OS.chat.messages = [{ role: 'assistant', content: '连接服务器失败：' + e.message + '。可能是免费实例冷启动中，稍等几秒刷新重试。', error: true }];
   }
   OS.chat.renderAll();
+  OS.chat.restoreDraft();
+  OS.chat.syncSendButton();
 };
 OS.chat.ensureLoaded = function() { if (!OS.chat.loaded) { OS.chat.loaded = true; OS.chat.init(); } else OS.chat.renderAll(); };
 OS.chat.createSession = async function(name) { const r = await fetch(API_BASE + '/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name || '新的对话' }) }); if (!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).session; };
 OS.chat.loadMessages = async function() { const r = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages?limit=500'); if (!r.ok) throw new Error('HTTP ' + r.status); OS.chat.messages = ((await r.json()).messages || []).filter((m) => m.visible !== false).map(chatMapMessage); };
 OS.chat.loadSessionSettings = async function() { try { const r = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/settings'); OS.chat.sessionSettings = r.ok ? ((await r.json()).settings || {}) : {}; } catch (e) { OS.chat.sessionSettings = {}; } };
 OS.chat.saveSessionSettings = async function() { if (!OS.chat.currentId) return; const s = aiSet(); try { await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system_prompt: s.systemPrompt, stream: s.streaming, use_memory: s.memory, auto_compress: s.autoCompress }) }); } catch (e) {} };
-OS.chat.newChat = async function() { try { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions.unshift(c); OS.chat.currentId = c.id; OS.chat.messages = []; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderAll(); } catch (e) { toast('新建会话失败：' + e.message, true); } };
-OS.chat.switch = async function(id) { if (Date.now() - _chatLongPress < 600) return; OS.chat.currentId = id; OS.chat.attachments = []; OS.chat.sidebarOpen = false; OS.chat.renderSessions(); const el = document.getElementById('chatMsgs'); if (el) el.innerHTML = '<div class="muted" style="margin:auto">加载中…</div>'; try { await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } catch (e) { OS.chat.messages = [{ role: 'assistant', content: '加载失败：' + e.message, error: true }]; } OS.chat.renderAll(); };
+OS.chat.newChat = async function() { OS.chat.saveDraft(); try { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions.unshift(c); OS.chat.currentId = c.id; OS.chat.messages = []; OS.chat.attachments = []; OS.chat.editingId = null; OS.chat.renderEditBar(); OS.chat.sidebarOpen = false; OS.chat.renderAll(); OS.chat.restoreDraft(); OS.chat.syncSendButton(); } catch (e) { toast('新建会话失败：' + e.message, true); } };
+OS.chat.switch = async function(id) { if (Date.now() - _chatLongPress < 600) return; if (_sessionPress.suppressClick) { _sessionPress.suppressClick = false; return; } OS.chat.saveDraft(); OS.chat.currentId = id; OS.chat.attachments = []; OS.chat.editingId = null; OS.chat.renderEditBar(); OS.chat.sidebarOpen = false; OS.chat.renderSessions(); const el = document.getElementById('chatMsgs'); if (el) el.innerHTML = '<div class="muted" style="margin:auto">加载中…</div>'; try { await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } catch (e) { OS.chat.messages = [{ role: 'assistant', content: '加载失败：' + e.message, error: true }]; } OS.chat.renderAll(); OS.chat.restoreDraft(); OS.chat.syncSendButton(); };
 OS.chat.setModel = function(v) { aiSet().model = v; syncActiveAssistantBack(); saveDB(); toast('已切换模型'); };
 OS.chat.switchAssistant = function(id) {
+  // 全局默认切换（设置页用）：改 activeAssistantId + aiSettings
   const a = ensureAssistants().find((x) => x.id === id);
-  if (!a) return;
+  if (!a) { toast('助手不存在', true); return; }
   applyAssistant(a);
   saveDB();
   OS.chat.renderHeader(); OS.chat.renderMessages();
   toast('已切换到 ' + (a.name || '助手'));
 };
+OS.chat.switchConversationAssistant = function(id) {
+  // 聊天页：只影响当前对话，写 conversation.assistant_id；历史消息与输入草稿保留，失败回滚
+  const a = ensureAssistants().find((x) => x.id === id);
+  if (!a) { toast('助手不存在', true); return; }
+  const cur = OS.chat.chatSession();
+  if (!cur) { OS.chat.switchAssistant(id); return; }
+  const before = cur.assistant_id;
+  cur.assistant_id = id; // 乐观更新
+  OS.chat.renderHeader();
+  fetch(API_BASE + '/api/sessions/' + cur.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assistant_id: id }) })
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json().catch(() => ({})); })
+    .then((d) => { if (d.session) cur.assistant_id = d.session.assistant_id; OS.chat.renderHeader(); toast('当前对话已切换到 ' + (a.name || '助手')); })
+    .catch((e) => { cur.assistant_id = before; OS.chat.renderHeader(); toast('切换失败，已回退：' + e.message, true); });
+};
+OS.chat.assistantPicker = function() {
+  const list = ensureAssistants();
+  const cur = OS.chat.currentAssistant();
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    '<div class="sheet-head"><div style="font-weight:700;font-size:16px">选择 AI 助手</div><div class="muted" style="font-size:12px">只影响当前对话，历史消息保留</div></div>' +
+    list.map((a) => {
+      const av = a.avatar || a.avatarUrl || '';
+      const ico = av ? '<span class="avatar" style="width:28px;height:28px;background-image:url(' + av + ')"></span>' : '♥';
+      return '<button class="sheet-item" onclick="OS.closeModal();OS.chat.switchConversationAssistant(\'' + a.id + '\')"><span class="ico">' + ico + '</span><span class="grow" style="text-align:left;min-width:0"><div style="font-weight:600">' + esc(a.name || '未命名') + (a.id === (cur && cur.id) ? ' <span class="muted" style="font-size:11px">(当前)</span>' : '') + '</div><div class="muted" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.model || '') + (a.personality ? ' · ' + esc(a.personality) : '') + '</div></span></button>';
+    }).join('') +
+    '<button class="sheet-item" onclick="OS.closeModal();OS.go(\'/settings/ai\')"><span class="ico">＋</span>管理助手…</button>' +
+    '</div>', 'bottom');
+};
 OS.chat.assistantMenu = function(e) {
   const list = ensureAssistants();
-  const items = list.map((a) => ({ label: (a.id === DB.activeAssistantId ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchAssistant(\'' + a.id + '\')' }));
+  const cur = OS.chat.currentAssistant();
+  const items = list.map((a) => ({ label: (a.id === (cur && cur.id) ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchConversationAssistant(\'' + a.id + '\')' }));
   items.push({ label: '管理助手…', ico: '＋', fn: 'OS.closeMenu();OS.go(\'/settings/ai\')' });
   menu(items, e.clientX, e.clientY);
 };
@@ -3051,12 +3383,90 @@ OS.chat.sessionMenu = function(e, id) {
   const items = [ { label: '重命名', ico: '✎', fn: 'OS.closeMenu();OS.chat.renameSession(\'' + sid + '\')' }, { label: '置顶 / 取消置顶', ico: '📌', fn: 'OS.closeMenu();OS.chat.togglePinSession(\'' + sid + '\')' }, { label: '删除', ico: '🗑', danger: true, fn: 'OS.closeMenu();OS.chat.deleteSession(\'' + sid + '\')' } ];
   menu(items, e.clientX, e.clientY);
 };
+// 需求 1：长按会话列表项（非气泡）→ 底部 Action Sheet；~500ms，pointerdown/up/cancel，滑动取消，长按后吞掉紧随的 click
+let _sessionPress = { id: null, timer: null, moved: false, suppressClick: false };
+OS.chat.sessionPressStart = function(e, id) {
+  _sessionPress.id = id; _sessionPress.moved = false; _sessionPress.suppressClick = false;
+  clearTimeout(_sessionPress.timer);
+  _sessionPress.timer = setTimeout(() => {
+    if (!_sessionPress.moved && _sessionPress.id === id) {
+      _sessionPress.suppressClick = true;
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+      OS.chat.sessionSheet(id); _sessionPress.id = null;
+    }
+  }, 500);
+};
+OS.chat.sessionPressMove = function() { _sessionPress.moved = true; };
+OS.chat.sessionPressEnd = function() { clearTimeout(_sessionPress.timer); };
+OS.chat.sessionSheet = function(id) {
+  const s = OS.chat.sessions.find((x) => x.id === id);
+  if (!s) return;
+  const c = 'OS.closeModal();';
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    '<button class="sheet-item" onclick="' + c + 'OS.chat.multiSelectStart()"><span class="ico">☑</span>多选</button>' +
+    '<button class="sheet-item" onclick="' + c + 'OS.chat.renameSession(\'' + id + '\')"><span class="ico">✎</span>重命名</button>' +
+    '<button class="sheet-item" onclick="' + c + 'OS.chat.togglePinSession(\'' + id + '\')"><span class="ico">📌</span>' + (s.pinned ? '取消置顶' : '置顶') + '</button>' +
+    '<button class="sheet-item" onclick="' + c + 'OS.chat.retitleSession(\'' + id + '\')"><span class="ico">✨</span>重新生成标题</button>' +
+    '<button class="sheet-item" onclick="' + c + 'OS.chat.duplicateSession(\'' + id + '\')"><span class="ico">⧉</span>复制</button>' +
+    '<button class="sheet-item" style="color:#c0392b" onclick="' + c + 'OS.chat.deleteSession(\'' + id + '\')"><span class="ico">🗑</span>删除</button>' +
+    '</div>', 'bottom');
+};
+OS.chat.multiSelectStart = function() { OS.chat.multiSelect = true; OS.chat.multiSelected = {}; OS.chat.sidebarOpen = true; OS.chat.renderSessions(); };
+OS.chat.toggleSessionSelect = function(id) { if (OS.chat.multiSelected[id]) delete OS.chat.multiSelected[id]; else OS.chat.multiSelected[id] = true; OS.chat.renderSessions(); };
+OS.chat.cancelMultiSelect = function() { OS.chat.multiSelect = false; OS.chat.multiSelected = {}; OS.chat.renderSessions(); };
+OS.chat.renderMultiBar = function() {
+  const el = document.getElementById('chatMultiBar'); if (!el) return;
+  if (!OS.chat.multiSelect) { el.innerHTML = ''; return; }
+  const n = Object.keys(OS.chat.multiSelected).length;
+  el.innerHTML = '<div style="padding:10px 6px;border-top:1px solid var(--border)"><div style="display:flex;gap:8px">' +
+    (n > 0 ? '<button class="btn btn-sm btn-danger" style="flex:1" onclick="OS.chat.deleteSelectedSessions()">删除所选 (' + n + ')</button>' : '') +
+    '<button class="btn btn-sm" style="flex:1" onclick="OS.chat.cancelMultiSelect()">取消</button></div></div>';
+};
+OS.chat.deleteSelectedSessions = function() {
+  const ids = Object.keys(OS.chat.multiSelected);
+  if (ids.length === 0) return;
+  confirmDialog('删除所选会话', '删除选中的 ' + ids.length + ' 个会话？消息将一并删除。', async () => {
+    try {
+      for (const id of ids) await fetch(API_BASE + '/api/sessions/' + id, { method: 'DELETE' });
+      OS.chat.sessions = OS.chat.sessions.filter((x) => !ids.includes(x.id));
+      if (OS.chat.sessions.length === 0) { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions = [c]; }
+      if (ids.includes(OS.chat.currentId)) { OS.chat.currentId = OS.chat.sessions[0].id; await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); }
+      OS.chat.multiSelect = false; OS.chat.multiSelected = {};
+      OS.chat.renderAll();
+      toast('已删除 ✓');
+    } catch (e) { toast('删除失败：' + e.message, true); }
+  }, '删除');
+};
+OS.chat.retitleSession = async function(id) {
+  toast('正在生成标题…');
+  try {
+    const r = await fetch(API_BASE + '/api/sessions/' + id + '/retitle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: aiSet().model }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    const s2 = OS.chat.sessions.find((x) => x.id === id);
+    if (s2 && d.session) s2.name = d.session.name;
+    OS.chat.renderSessions(); OS.chat.renderHeader();
+    toast('标题已更新 ✓');
+  } catch (e) { toast('生成标题失败：' + e.message, true); }
+};
+OS.chat.duplicateSession = async function(id) {
+  toast('正在复制会话…');
+  try {
+    const r = await fetch(API_BASE + '/api/sessions/' + id + '/duplicate', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if (d.session) OS.chat.sessions.unshift(d.session);
+    OS.chat.renderSessions();
+    toast('已复制会话 ✓');
+  } catch (e) { toast('复制失败：' + e.message, true); }
+};
 // 顶栏 ⋯：模型选择 + 当前会话操作（需求 6：模型选择从顶栏移入菜单）
 OS.chat.topMenu = function(e) {
   const s = aiSet();
   const items = [];
   items.push({ label: 'AI 助手', header: true });
-  ensureAssistants().forEach((a) => items.push({ label: (a.id === DB.activeAssistantId ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchAssistant(\'' + a.id + '\')' }));
+  const curA = OS.chat.currentAssistant();
+  ensureAssistants().forEach((a) => items.push({ label: (a.id === (curA && curA.id) ? '✓ ' : '') + (a.name || '未命名'), ico: '♥', fn: 'OS.closeMenu();OS.chat.switchConversationAssistant(\'' + a.id + '\')' }));
   items.push({ label: '模型', header: true });
   MODELS.forEach(([v, label]) => items.push({ label: (v === s.model ? '✓ ' : '') + label, ico: '🤖', fn: 'OS.closeMenu();OS.chat.setModel(\'' + v + '\')' }));
   items.push({ label: '会话', header: true });
@@ -3074,62 +3484,112 @@ OS.chat.deleteSession = function(id) {
     try { await fetch(API_BASE + '/api/sessions/' + id, { method: 'DELETE' }); OS.chat.sessions = OS.chat.sessions.filter((x) => x.id !== id); if (OS.chat.sessions.length === 0) { const c = await OS.chat.createSession('新的对话'); OS.chat.sessions = [c]; } if (OS.chat.currentId === id) { OS.chat.currentId = OS.chat.sessions[0].id; await OS.chat.loadMessages(); await OS.chat.loadSessionSettings(); } OS.chat.renderAll(); } catch (e) { toast('删除失败：' + e.message, true); }
   }, '删除');
 };
-OS.chat.onFiles = function(input) {
-  Array.from(input.files).forEach((file) => {
-    if (file.size > 10 * 1024 * 1024) { toast('文件过大（>10MB）', true); return; }
-    if (file.type.startsWith('image/')) { const r = new FileReader(); r.onload = (ev) => { OS.chat.attachments.push({ file, dataUrl: ev.target.result, name: file.name, type: file.type }); OS.chat.renderAttach(); }; r.readAsDataURL(file); }
-    else OS.chat.attachments.push({ file, dataUrl: null, name: file.name, type: file.type }); OS.chat.renderAttach();
-  });
+OS.chat.onFiles = async function(input) {
+  const files = Array.from(input.files || []);
   input.value = '';
+  for (const file of files) {
+    const isImg = (file.type || '').startsWith('image/');
+    const max = isImg ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (file.size > max) { toast('文件过大（' + (isImg ? '图片≤20MB' : '文件≤50MB') + '）：' + file.name, true); continue; }
+    const att = { id: null, name: file.name, type: file.type || 'application/octet-stream', size: file.size, fileUrl: '', dataUrl: null, status: 'uploading' };
+    OS.chat.attachments.push(att);
+    OS.chat.renderAttach();
+    try {
+      const dataUrl = await readAsDataURL(file);
+      if (isImg) att.dataUrl = dataUrl;
+      const r = await fetch(API_BASE + '/api/files/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: file.name, mimeType: att.type, dataBase64: dataUrl }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+      const up = (j.data && j.data.attachment) || {};
+      att.id = up.id || null;
+      att.fileUrl = up.fileUrl || (j.data && j.data.publicUrl) || '';
+      att.status = 'done';
+    } catch (e) {
+      att.status = 'error'; att.error = e.message;
+    }
+    OS.chat.renderAttach();
+  }
 };
 OS.chat.renderAttach = function() {
   const el = document.getElementById('chatAttach'); if (!el) return;
-  el.innerHTML = OS.chat.attachments.map((a, i) => '<span class="chip" style="gap:6px">' + (a.dataUrl ? '<img src="' + a.dataUrl + '" style="width:22px;height:22px;border-radius:6px;object-fit:cover">' : '📄') + '<span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.name) + '</span><button onclick="OS.chat.removeAttach(' + i + ')" style="border:none;background:none;color:inherit;cursor:pointer">×</button></span>').join('');
+  if (!OS.chat.attachments.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = OS.chat.attachments.map((a, i) => {
+    const st = a.status === 'uploading' ? '<span class="muted">⏳ 上传中</span>' : (a.status === 'error' ? '<span style="color:#c0392b">✕ 失败</span>' : '<span style="color:#2e7d32">✓</span>');
+    return '<span class="chip" style="gap:6px">' + (a.dataUrl ? '<img src="' + a.dataUrl + '" style="width:22px;height:22px;border-radius:6px;object-fit:cover">' : '📄') + '<span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.name) + '</span>' + st + '<button onclick="OS.chat.removeAttach(' + i + ')" style="border:none;background:none;color:inherit;cursor:pointer">×</button></span>';
+  }).join('');
 };
 OS.chat.removeAttach = function(i) { OS.chat.attachments.splice(i, 1); OS.chat.renderAttach(); };
-function readTextFile(file) { return new Promise((resolve) => { if (file.type.startsWith('text/') || file.name.endsWith('.txt')) { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.readAsText(file); } else resolve(null); }); }
+OS.chat.previewImage = function(url) {
+  modal('<div class="modal-body" style="padding:0;position:relative;background:rgba(0,0,0,.85)"><img src="' + url + '" style="width:100%;max-height:80vh;object-fit:contain;border-radius:12px"><button class="x" style="position:absolute;top:8px;right:8px;color:#fff;background:rgba(0,0,0,.5);border-radius:50%;width:32px;height:32px" onclick="OS.closeModal()">✕</button></div>');
+};
+OS.chat.previewFile = function(url, name) {
+  if (url) window.open(url, '_blank', 'noopener');
+  else toast('文件不可用（' + (name || '') + '）', true);
+};
 OS.chat.send = async function() {
+  if (OS.chat.isGenerating) return;
   const input = document.getElementById('chatInput'); const text = input.value.trim();
   if (!text && OS.chat.attachments.length === 0) return;
   if (!OS.chat.currentId) { toast('还没有会话', true); return; }
+  // 附件上传状态：有上传中/失败则阻止发送（需求：禁用发送，避免丢附件）
+  if (OS.chat.attachments.some((a) => a.status === 'uploading')) { toast('附件正在上传，请稍候', true); return; }
+  if (OS.chat.attachments.some((a) => a.status === 'error')) { toast('有附件上传失败，请移除后重试', true); return; }
+  // 编辑模式：改的是已存在的用户消息，走编辑接口（需求 3），不产生重复消息、不丢历史
+  const editingId = OS.chat.editingId;
+  OS.chat.editingId = null; OS.chat.renderEditBar();
   // 取出引用动态并清空（需求 33）：用户自己发送时才携带，绝不自动发送
   const quoted = OS.chat.quotedDynamic || null;
   OS.chat.quotedDynamic = null;
   const qc = document.querySelector('.quote-card'); if (qc) qc.remove();
+  if (editingId) { input.value = ''; OS.chat.attachments = []; OS.chat.renderAttach(); OS.chat.resend(editingId, text); return; }
   const now = new Date().toLocaleString();
-  let content = text;
-  for (const a of OS.chat.attachments) { const fc = await readTextFile(a.file); content = content ? content + '\n\n' + (a.dataUrl ? '[图片: ' + a.name + ']' : (fc !== null ? '[文件: ' + a.name + ']\n' + fc : '[文件: ' + a.name + '] (非文本)')) : (a.dataUrl ? '[图片: ' + a.name + ']' : '[文件: ' + a.name + ']'); }
-  const userMsg = { role: 'user', content, time: now, pendingUser: true, quotedDynamic: quoted };
+  const content = text; // 附件走独立 attachmentIds，绝不拼进正文（不污染消息原文）
+  const attachmentIds = OS.chat.attachments.filter((a) => a.id).map((a) => a.id);
+  const attachMeta = OS.chat.attachments.map((a) => ({ id: a.id, fileName: a.name, mimeType: a.type, size: a.size, fileUrl: a.fileUrl, dataUrl: a.dataUrl || null }));
+  const userMsg = { role: 'user', content, time: now, pendingUser: true, quotedDynamic: quoted, attachments: attachMeta };
   const thinking = { role: 'assistant', content: '', time: now, thinking: true };
   OS.chat.messages.push(userMsg, thinking);
   input.value = ''; OS.chat.attachments = []; OS.chat.renderAttach();
-  const btn = document.getElementById('chatSend'); if (btn) btn.disabled = true;
-  OS.chat.renderMessages();
+  OS.chat.clearDraft(OS.chat.currentId);
+  OS.chat.isGenerating = true; OS.chat.abortCtrl = new AbortController(); OS.chat.syncSendButton();
+  OS.chat.renderMessages(); OS.chat.scrollToBottom(true);
   const s = aiSet();
   try {
-    if (s.streaming) await OS.chat.sendStreaming(content, thinking, now, quoted);
+    if (s.streaming) await OS.chat.sendStreaming(content, attachmentIds, thinking, now, quoted);
     else {
-      const resp = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, model: s.model, notify: !(document.visibilityState === 'visible' && document.hasFocus()), quotedDynamic: quoted }) });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+      const resp = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: OS.chat.abortCtrl.signal, body: JSON.stringify({ content, model: s.model, notify: !(document.visibilityState === 'visible' && document.hasFocus()), quotedDynamic: quoted, attachmentIds }) });
+      const ct = (resp.headers.get('content-type') || '').toLowerCase();
+      let data = {};
+      if (ct.includes('json')) data = await resp.json().catch(() => ({}));
+      else { try { const txt = await resp.text(); console.error('[chat] AI 返回非 JSON（content-type: ' + ct + '）：', String(txt).slice(0, 500)); } catch (e) {} }
+      if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status + (ct.includes('json') ? '' : ' · 服务器返回了非 JSON 响应，请检查中转地址')));
       OS.chat.messages = OS.chat.messages.filter((m) => m !== thinking && !m.pendingUser);
       if (data.compressed) { await OS.chat.loadMessages(); OS.chat.messages.push({ role: 'assistant', content: '（已自动整理历史记忆）', time: now, note: true }); }
       else { OS.chat.messages.push(chatMapMessage(data.userMessage)); OS.chat.messages.push(chatMapMessage(data.assistantMessage)); }
     }
   } catch (err) {
-    OS.chat.messages = OS.chat.messages.filter((m) => m !== thinking && !m.pendingUser);
-    OS.chat.messages.push({ role: 'assistant', content: '❌ 请求失败：' + err.message, error: true });
+    if (!(err && err.name === 'AbortError')) {
+      OS.chat.messages = OS.chat.messages.filter((m) => m !== thinking && !m.pendingUser);
+      OS.chat.messages.push({ role: 'assistant', content: '❌ 请求失败：' + err.message, error: true });
+    }
+  } finally {
+    OS.chat.isGenerating = false; OS.chat.abortCtrl = null; OS.chat.syncSendButton();
+    OS.chat.renderAll();
   }
-  if (btn) btn.disabled = false;
-  OS.chat.renderAll();
 };
-OS.chat.sendStreaming = async function(content, thinking, now, quoted) {
+OS.chat.sendStreaming = async function(content, attachmentIds, thinking, now, quoted) {
   const s = aiSet();
-  const resp = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, model: s.model, notify: !(document.visibilityState === 'visible' && document.hasFocus()), quotedDynamic: quoted }) });
+  const resp = await fetch(API_BASE + '/api/sessions/' + OS.chat.currentId + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: OS.chat.abortCtrl ? OS.chat.abortCtrl.signal : undefined, body: JSON.stringify({ content, model: s.model, notify: !(document.visibilityState === 'visible' && document.hasFocus()), quotedDynamic: quoted, attachmentIds }) });
   if (!resp.ok) { let msg = 'HTTP ' + resp.status; try { msg = (await resp.json()).error || msg; } catch (e) {} throw new Error(msg); }
+  const sct = (resp.headers.get('content-type') || '').toLowerCase();
+  if (!sct.includes('text/event-stream')) {
+    let preview = ''; try { preview = String(await resp.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 200); } catch (e) {}
+    throw new Error('AI 流式响应异常（content-type: ' + (sct || '无') + '）' + (preview ? '：' + preview : '') + '。请检查「API 设置」里的中转地址');
+  }
   const reader = resp.body.getReader(); const decoder = new TextDecoder(); let buf = '', full = '', lastRender = 0;
   const apply = (text) => { thinking.content = text; thinking.thinking = false; const bubbles = document.querySelectorAll('#chatMsgs .bubble'); const el = bubbles[bubbles.length - 1]; if (el) el.innerHTML = '<div class="md">' + renderMarkdown(text) + '</div>'; };
-  while (true) { const { done, value } = await reader.read(); if (done) break; buf += decoder.decode(value, { stream: true }); let idx; while ((idx = buf.indexOf('\n\n')) >= 0) { const block = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2); if (!block.startsWith('data:')) continue; const payload = block.slice(5).trim(); if (payload === '[DONE]') continue; let obj; try { obj = JSON.parse(payload); } catch (e) { continue; } if (obj.error) throw new Error(obj.error); if (obj.delta) { full += obj.delta; const t = Date.now(); if (t - lastRender >= 40) { lastRender = t; apply(full); } } if (obj.done) { if (obj.compressed) await OS.chat.loadMessages(); else if (obj.assistantMessage) { const i = OS.chat.messages.indexOf(thinking); if (i >= 0) OS.chat.messages[i] = chatMapMessage(obj.assistantMessage); } apply(full); return; } } }
+  while (true) { const { done, value } = await reader.read(); if (done) break; buf += decoder.decode(value, { stream: true }); let idx; while ((idx = buf.indexOf('\n\n')) >= 0) { const block = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2); if (!block.startsWith('data:')) continue; const payload = block.slice(5).trim(); if (payload === '[DONE]') continue; let obj; try { obj = JSON.parse(payload); } catch (e) { continue; } if (obj.error) throw new Error(obj.error); if (obj.delta) { full += obj.delta; const t = Date.now(); if (t - lastRender >= 40) { lastRender = t; apply(full); } } if (obj.done) { if (obj.compressed) await OS.chat.loadMessages(); else { if (obj.userMessage) { const ui = OS.chat.messages.findIndex((m) => m.pendingUser); if (ui >= 0) OS.chat.messages[ui] = chatMapMessage(obj.userMessage); } if (obj.assistantMessage) { const i = OS.chat.messages.indexOf(thinking); if (i >= 0) OS.chat.messages[i] = chatMapMessage(obj.assistantMessage); } } apply(full); return; } } }
   apply(full);
 };
 OS.chat.copyMsg = async function(btn, id) { const m = OS.chat.messages.find((x) => x.id === id); if (!m) return; try { await navigator.clipboard.writeText(m.content); } catch (e) { const ta = document.createElement('textarea'); ta.value = m.content; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) {} ta.remove(); } btn.textContent = '已复制'; setTimeout(() => { btn.textContent = '复制'; }, 1500); };
@@ -3207,17 +3667,26 @@ OS.chat.bubblePressStart = function(e, id) {
 };
 OS.chat.bubblePressMove = function() { _chatMsgPress.moved = true; };
 OS.chat.bubblePressEnd = function() { clearTimeout(_chatMsgPress.timer); };
-// 需求 4B：编辑单条用户消息，改后重新发送，不产生重复消息
+// 需求 3：编辑单条用户消息 —— 内容回填到输入框（而非弹窗），用户改完直接点发送即走编辑接口，不产生重复消息
 OS.chat.editMessage = function(id) {
   const m = OS.chat.messages.find((x) => x.id === id);
   if (!m || m.role !== 'user') return;
-  modal('<div class="modal-head"><h3>编辑消息</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><textarea class="textarea" id="emContent" style="min-height:120px">' + esc(m.content) + '</textarea></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="OS.chat.doEdit(\'' + id + '\')">重新发送</button></div>');
+  OS.chat.editingId = id;
+  const input = document.getElementById('chatInput');
+  if (input) { input.value = m.content; input.focus(); }
+  OS.chat.renderEditBar();
 };
-OS.chat.doEdit = function(id) {
-  const el = document.getElementById('emContent'); const v = el ? el.value.trim() : '';
-  closeModal();
-  if (!v) return;
-  OS.chat.resend(id, v);
+OS.chat.cancelEdit = function() {
+  OS.chat.editingId = null;
+  const input = document.getElementById('chatInput');
+  if (input) { input.value = ''; input.focus(); }
+  OS.chat.renderEditBar();
+};
+OS.chat.renderEditBar = function() {
+  const el = document.getElementById('chatEditBar');
+  if (el) el.innerHTML = OS.chat.editingId
+    ? '<div class="chip" style="gap:8px;margin:6px 0 0"><span>✎ 编辑中，改完点发送</span><button style="border:none;background:none;color:inherit;cursor:pointer;font-weight:700" onclick="OS.chat.cancelEdit()">✕ 取消</button></div>'
+    : '';
 };
 OS.chat.regenerateFrom = function(id) { const m = OS.chat.messages.find((x) => x.id === id); if (m) OS.chat.resend(id, m.content); };
 OS.chat.resend = async function(id, content) {
@@ -3259,13 +3728,28 @@ async function checkProactive() { try { const r = await fetch(API_BASE + '/api/p
 /* ---- iPhone Safari 键盘：100dvh 在键盘弹出时不一定缩小，用 visualViewport 把聊天输入栏顶到键盘上方（需求 4） ---- */
 function bindKeyboardViewport() {
   if (!window.visualViewport) return;
+  const root = document.documentElement;
   const apply = () => {
     const stage = document.querySelector('.chat-stage');
     if (!stage) return;
-    stage.style.height = window.visualViewport.height + 'px';
+    const vv = window.visualViewport;
+    // 聊天页高度跟随可视视口（键盘弹出时缩小），CSS 用 --chat-vh 锚定，不平移整页/body
+    root.style.setProperty('--chat-vh', vv.height + 'px');
+    // iOS：fixed 元素锚定布局视口，键盘弹出触发视口滚动时用 offsetTop 补偿，只平移聊天页
+    stage.style.transform = vv.offsetTop ? ('translateY(' + vv.offsetTop + 'px)') : '';
   };
   window.visualViewport.addEventListener('resize', apply);
   window.visualViewport.addEventListener('scroll', apply);
+  apply();
+  // 离开聊天页时清理 CSS 变量与位移，避免污染其他页面
+  const cleanup = () => {
+    root.style.removeProperty('--chat-vh');
+    root.style.removeProperty('--chat-keyboard-inset');
+    const st = document.querySelector('.chat-stage');
+    if (st) st.style.transform = '';
+  };
+  window.addEventListener('hashchange', () => { if (parseHash() !== '/chat') cleanup(); });
+  window.addEventListener('beforeunload', cleanup);
 }
 
 /* ================= INIT ================= */
@@ -3335,7 +3819,7 @@ function buildAIContext() {
     plans: { active: active.length, types: active.map((p) => p.type) },
     habits: { total: DB.habits.length, doneToday: habitsToday.filter((h) => h.done).length, list: habitsToday },
     shopping: { mine: shoppingItemsOf('mine').filter((i) => !i.completed).length, deity: shoppingItemsOf('deity').filter((i) => !i.completed).length },
-    memories: (DB.ai.memories || []).map((m) => ({ content: m.content, category: m.category })),
+    memories: (DB.ai.memories || []).filter((m) => memActive(m)).map((m) => ({ content: memText(m), category: memCat(m.category) })),
     aiStates: (DB.ai.states || []).filter((s) => !s.acknowledged).map((s) => ({ emotion: s.emotion, intensity: s.intensity })),
     music: currentTrack() ? { title: currentTrack().title, artist: currentTrack().artist, playing: DB.player.playing, together: !!DB.player.togetherListening } : null,
     weather: DB.weather ? { text: DB.weather.text, temp: DB.weather.temp, code: DB.weather.code } : null,
@@ -3347,24 +3831,153 @@ function buildAIContext() {
   };
 }
 
-/* ---- AI 记忆（只记长期偏好/习惯/明确请求/重要信息） ---- */
-function aiAddMemory(content, category, sourceType, sourceId) {
-  if (!content || !String(content).trim()) return;
-  const mem = { id: uid(), content: String(content).trim(), category: category || '偏好', sourceType: sourceType || 'manual', sourceId: sourceId || null, confidence: 0.8, createdAt: Date.now(), updatedAt: Date.now() };
-  (DB.ai.memories || (DB.ai.memories = [])).unshift(mem);
-  saveDB();
-  aiLogActivity('memory', '记住了：' + mem.content);
-  return mem;
+/* ---- AI 记忆（结构化：只记长期偏好/习惯/明确请求/重要信息，绝不记每句话） ---- */
+const MEM_CATS = { profile: '我的信息', preference: '我的偏好', important_conversation: '重要对话', functional_preference: '功能配置', task_context: '项目上下文' };
+function memCat(v) {
+  const s = String(v || '').trim();
+  if (MEM_CATS[s]) return s;
+  if (/偏好|喜欢|喜好|习惯/.test(s)) return 'preference';
+  if (/重要|记住|决策|约定|项目|决定/.test(s)) return 'important_conversation';
+  if (/信息|称呼|名字|语言|昵称/.test(s)) return 'profile';
+  if (/配置|功能|设置/.test(s)) return 'functional_preference';
+  if (/上下文|约束|任务/.test(s)) return 'task_context';
+  return 'preference';
 }
-function aiDeleteMemory(id) { DB.ai.memories = (DB.ai.memories || []).filter((m) => m.id !== id); saveDB(); render(); }
+function memLabel(m) { return MEM_CATS[memCat(m.category)] || '偏好'; }
+function memText(m) { return String(m.summary || m.content || ''); }
+function memActive(m) { return m.isActive !== false; }
+/* ---- 记忆 REST 同步：真实数据源为 /api/memories，DB.ai.memories 仅作兼容缓存 ---- */
+let _memLoading = false;
+let _memError = null;
+let _memLoaded = false;
+let _memBusy = false;
+let _memCandidates = [];
+function memSyncCache(list) {
+  DB.ai.memories = (list || []).map((m) => ({ ...m, summary: m.summary || m.content || '', content: m.summary || m.content || '' }));
+}
+async function loadMemCandidates() {
+  const r = await apiJson('/api/memories/candidates');
+  _memCandidates = (r.ok && r.data && r.data.candidates) ? r.data.candidates : [];
+}
+async function loadMemories() {
+  _memLoading = true; _memError = null; renderMemList();
+  const r = await apiJson('/api/memories?includeInactive=true');
+  _memLoading = false;
+  if (r.ok) {
+    memSyncCache(r.data && r.data.memories);
+    if (r.data && r.data.version != null) DB.version = r.data.version;
+    _memLoaded = true;
+  } else {
+    _memError = (r.err === 'network' || r.err === 'not-json' || r.err === 'parse') ? '无法连接服务，请检查后端是否已启动' : (r.message || '加载失败');
+  }
+  await loadMemCandidates();
+  render(); // 全量刷新：计数 + 列表 + 候选
+}
+async function aiAddMemory(content, category, sourceType, sourceId, opts) {
+  if (!content || !String(content).trim()) return null;
+  const o = opts || {};
+  const r = await apiJson('/api/memories', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: String(content).trim(), category: category || 'preference',
+      key: o.key || '', value: (o.value !== undefined ? o.value : null),
+      title: o.title || '', importance: o.importance || 'normal',
+      source: o.source || (sourceType === 'manual' || sourceType === 'import' ? 'imported' : 'user_message'),
+      sourceType: sourceType || 'manual', sourceId: sourceId || null,
+    }),
+  });
+  if (!r.ok) { toast(r.message || '保存失败', true); return null; }
+  await memRefresh();
+  aiLogActivity('memory', '记住了：' + String(content).trim());
+  return (r.data && r.data.memory) || null;
+}
+async function memRefresh() {
+  const r = await apiJson('/api/memories?includeInactive=true');
+  if (!r.ok) return false;
+  memSyncCache(r.data && r.data.memories);
+  if (r.data && r.data.version != null) DB.version = r.data.version;
+  await loadMemCandidates();
+  renderMemList();
+  return true;
+}
+function aiDeleteMemory(id) {
+  const m = (DB.ai.memories || []).find((x) => x.id === id);
+  confirmDialog('删除记忆', '确定删除「' + (m ? memText(m) : '这条记忆') + '」？此操作不可恢复。', () => aiDeleteMemoryConfirm(id), '删除');
+}
+async function aiDeleteMemoryConfirm(id) {
+  if (_memBusy) return;
+  _memBusy = true; renderMemList();
+  const r = await apiJson('/api/memories/' + encodeURIComponent(id), { method: 'DELETE' });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '删除失败', true); renderMemList(); return; }
+  DB.ai.memories = (DB.ai.memories || []).filter((m) => m.id !== id);
+  if (r.data && r.data.version != null) DB.version = r.data.version;
+  render(); toast('已删除');
+}
+async function aiToggleMemory(id) {
+  if (_memBusy) return;
+  const m = (DB.ai.memories || []).find((x) => x.id === id); if (!m) return;
+  const activating = !memActive(m);
+  _memBusy = true; renderMemList();
+  const r = await apiJson('/api/memories/' + encodeURIComponent(id) + (activating ? '/restore' : '/deactivate'), { method: 'POST' });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '操作失败', true); renderMemList(); return; }
+  await memRefresh();
+  toast(activating ? '已恢复记忆 ♥' : '已停用（可切到「已停用」恢复）');
+}
+function aiClearMemories() {
+  const n = (DB.ai.memories || []).length; if (!n) { toast('还没有记忆'); return; }
+  modal('<div class="modal-head"><h3>清空记忆</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><p>确定要清空全部 ' + n + ' 条记忆吗？此操作不可恢复，且不会清除记忆设置。</p></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" style="background:#c0392b" onclick="aiClearMemoriesConfirm()">清空</button></div>');
+}
+async function aiClearMemoriesConfirm() {
+  if (_memBusy) return;
+  _memBusy = true;
+  const r = await apiJson('/api/memories/clear', { method: 'POST' });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '清空失败', true); return; }
+  DB.ai.memories = [];
+  if (r.data && r.data.version != null) DB.version = r.data.version;
+  closeModal(); render(); toast('已清空全部记忆');
+}
 function aiEditMemory(id) {
   const m = (DB.ai.memories || []).find((x) => x.id === id); if (!m) return;
-  modal('<div class="modal-head"><h3>编辑记忆</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>内容</label><textarea class="textarea" id="amContent">' + esc(m.content) + '</textarea></div><div class="field"><label>分类</label><input class="input" id="amCat" value="' + esc(m.category) + '"></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="aiSaveMemory(\'' + m.id + '\')">保存</button></div>');
+  const catOpts = Object.keys(MEM_CATS).map((k) => '<option value="' + k + '"' + (memCat(m.category) === k ? ' selected' : '') + '>' + MEM_CATS[k] + '</option>').join('');
+  modal('<div class="modal-head"><h3>编辑记忆</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>内容</label><textarea class="textarea" id="amContent">' + esc(memText(m)) + '</textarea></div><div class="field"><label>分类</label><select class="select" id="amCat">' + catOpts + '</select></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="aiSaveMemory(\'' + m.id + '\')">保存</button></div>');
 }
-function aiSaveMemory(id) {
+async function aiSaveMemory(id) {
+  if (_memBusy) return;
   const m = (DB.ai.memories || []).find((x) => x.id === id); if (!m) return;
-  m.content = document.getElementById('amContent').value.trim(); m.category = document.getElementById('amCat').value.trim() || '偏好'; m.updatedAt = Date.now();
-  saveDB(); closeModal(); render(); toast('已更新 ✓');
+  const c = document.getElementById('amContent').value.trim(); if (!c) { toast('内容不能为空', true); return; }
+  const category = document.getElementById('amCat').value || 'preference';
+  _memBusy = true;
+  const r = await apiJson('/api/memories/' + encodeURIComponent(id), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ summary: c, category }),
+  });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '更新失败', true); return; }
+  await memRefresh();
+  closeModal(); render(); toast('已更新 ✓');
+}
+function aiCandidateHtml(c) {
+  return '<div class="ai-mem-item" style="border-left:3px solid var(--accent)"><div class="spread"><div style="flex:1"><div style="font-size:14px;font-weight:600">' + esc(c.summary || c.content || '') + ' <span class="chip" style="font-size:10px">待确认</span></div><div class="muted" style="font-size:11px;margin-top:4px"><span class="shop-cat">' + memLabel(c) + '</span> · AI 提取的候选</div></div><div class="row" style="gap:4px"><button class="btn btn-sm btn-primary" onclick="aiConfirmCandidate(\'' + c.id + '\')">记住</button><button class="btn btn-sm" onclick="aiRejectCandidate(\'' + c.id + '\')">忽略</button></div></div></div>';
+}
+async function aiConfirmCandidate(id) {
+  if (_memBusy) return;
+  _memBusy = true;
+  const r = await apiJson('/api/memories/candidates/' + encodeURIComponent(id) + '/confirm', { method: 'POST' });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '确认失败', true); return; }
+  await memRefresh();
+  toast('已记住 ♥');
+}
+async function aiRejectCandidate(id) {
+  if (_memBusy) return;
+  _memBusy = true;
+  const r = await apiJson('/api/memories/candidates/' + encodeURIComponent(id) + '/reject', { method: 'POST' });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '操作失败', true); return; }
+  await loadMemCandidates(); render();
 }
 function aiMarkAsked(key) { if (!DB.ai._asked) DB.ai._asked = {}; DB.ai._asked[key] = Date.now(); }
 function aiAskedRecently(key, windowMs) { const t = (DB.ai._asked || {})[key]; if (!t) return false; return Date.now() - t < (windowMs || 24 * 3600 * 1000); }
@@ -3559,42 +4172,50 @@ const WeatherProvider = {
 function setMockWeather(text, temp, code) { DB.weather = { text, temp, code, source: 'mock', updatedAt: Date.now() }; saveDB(); render(); toast('已更新天气（Mock）'); WeatherProvider.evaluate(DB.weather); }
 
 const LocationProvider = {
-  // 优先走高德定位：先 IP 定位（国内稳定、即时、城市级，无需浏览器定位权限）；
-  // 浏览器 GPS 仅在高德不可用时兜底（国内 Chrome/Edge 依赖 Google 定位服务常超时）。
+  _lastError: null,
+  // 最后一次定位失败原因（供 UI 清晰展示 denied / unsupported / timeout，不伪造位置）
+  lastError() { return this._lastError; },
+  // 需求 10：真实定位优先 navigator.geolocation（含精度/时间戳/反向地理编码），
+  // 失败才降级到城市级 IP 大致定位（明确 source='ip'，绝不冒充 GPS）。
   async getCurrentLocation() {
-    const ipLoc = await this.ipLocation();
-    if (ipLoc) return ipLoc;
     const gps = await this.gpsLocation();
     if (gps && gps.lat) { DB.location = gps; saveDB(); return gps; }
-    // 高德 IP 与浏览器 GPS 都不可用时返回 null，绝不伪造定位（需求 11）
+    const ipLoc = await this.ipLocation();
+    if (ipLoc) return ipLoc;
+    // GPS 与 IP 都不可用时返回 null，绝不伪造定位
     return null;
   },
-  // 高德 IP 定位（城市级）
+  // 高德 IP 定位（城市级大致位置，兜底；仅在 GPS 失败后调用）
   async ipLocation() {
     try {
       const r = await fetch(API_BASE + '/api/ip-location');
       if (r.ok) {
         const d = (await r.json()).data;
         if (d && (d.city || d.province)) {
-          const loc = { city: d.city || d.province, lat: d.lat || null, lng: d.lng || null, source: 'ip', updatedAt: Date.now() };
+          const loc = { city: d.city || d.province, lat: d.lat || null, lng: d.lng || null, source: 'ip', precision: 'city', updatedAt: Date.now() };
           DB.location = loc; saveDB(); return loc;
         }
       }
     } catch (e) {}
     return null;
   },
-  // 浏览器 GPS（精确坐标，兜底）
+  // 浏览器 GPS（精确坐标 + 精度 + 时间戳）；权限被拒/不可用/超时均记录到 _lastError
   gpsLocation() {
     return new Promise((resolve) => {
-      if (!('geolocation' in navigator)) return resolve(null);
+      if (!('geolocation' in navigator)) { this._lastError = { code: 'unsupported', message: '当前浏览器/环境不支持定位' }; return resolve(null); }
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        const acc = pos.coords.accuracy || null;
+        const ts = pos.timestamp || Date.now();
         const city = await this.reverseGeocode(lat, lng);
-        resolve({ city, lat, lng, source: 'geolocation', updatedAt: Date.now() });
+        this._lastError = null;
+        resolve({ city, lat, lng, accuracy: acc, timestamp: ts, source: 'geolocation', updatedAt: Date.now() });
       }, (err) => {
+        const msg = { 1: '用户拒绝了定位权限', 2: '定位信息当前不可用', 3: '定位请求超时' }[err && err.code] || ('定位失败' + (err && err.message ? '：' + err.message : ''));
+        this._lastError = { code: String((err && err.code) || 'error'), message: msg };
         try { console.warn('[location] 浏览器 GPS 不可用:', err && err.code, err && err.message); } catch (e) {}
         resolve(null);
-      }, { timeout: 8000, maximumAge: 5 * 60 * 1000 });
+      }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 });
     });
   },
   async reverseGeocode(lat, lng) {
@@ -3686,6 +4307,8 @@ function viewFinance() {
     '<div class="card stat-card"><div style="font-size:20px;margin-bottom:6px">📈</div><div class="v">' + fmtMoney(s.monthIncomeCents) + '</div><div class="l">本月收入</div></div>' +
     '<div class="card stat-card" style="cursor:pointer" onclick="budgetModal()"><div style="font-size:20px;margin-bottom:6px">🎯</div><div class="v">' + (s.budget ? fmtMoney(s.budget) : '—') + '</div><div class="l">本月预算</div><div class="u">点击设置</div></div>' +
     '</div>';
+  // AI 点评（模型生成，非硬编码）：懒加载占位，afterRender 里异步填充
+  html += '<div class="card card-pad" id="financeAiComment" style="padding:12px 14px;margin-bottom:16px;display:none"><div style="font-weight:700;font-size:13px;margin-bottom:4px">♥ AI 点评</div><div id="financeAiCommentText" class="muted" style="font-size:13px;line-height:1.5">正在生成…</div></div>';
   const cats = Object.entries(s.cat).sort((a, b) => b[1] - a[1]);
   if (cats.length) {
     const max = cats[0][1];
@@ -3696,6 +4319,26 @@ function viewFinance() {
   html += '<div class="section-head"><h2>最近记录</h2></div>';
   html += '<div class="card card-pad" style="padding:4px 8px">' + (list.length ? list.map(financeRowHtml).join('') : '<div class="empty"><div class="eico">💰</div><div class="etitle">还没有记账</div><div class="esub">点「记一笔」开始记录收支</div></div>') + '</div>';
   return html;
+}
+let _financeComment = null; // 本次会话内缓存 AI 点评，避免每次进页面重复请求
+function setFinanceComment(c) {
+  const el = document.getElementById('financeAiComment');
+  const text = document.getElementById('financeAiCommentText');
+  if (!el) return;
+  if (!c) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (text) text.textContent = c;
+}
+async function loadFinanceComment() {
+  const el = document.getElementById('financeAiComment');
+  if (!el) return;
+  if (_financeComment != null) { setFinanceComment(_financeComment); return; }
+  el.style.display = 'block';
+  const r = await apiJson('/api/ai/finance/comment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!r.ok) { setFinanceComment(''); return; }
+  const c = (r.data && r.data.comment) || '';
+  _financeComment = c;
+  setFinanceComment(c);
 }
 function financeRowHtml(e) {
   const income = financeIsIncome(e);
@@ -3828,18 +4471,75 @@ function viewShopping() {
 
 /* ---- AI 记忆页 ---- */
 function aiMemoryItemHtml(m) {
-  return '<div class="ai-mem-item"><div class="spread"><div style="flex:1"><div style="font-size:14px;font-weight:600">' + esc(m.content) + '</div><div class="muted" style="font-size:11px;margin-top:4px"><span class="shop-cat">' + esc(m.category) + '</span> · 信心 ' + Math.round((m.confidence || 0) * 100) + '% · ' + relTime(m.createdAt) + '</div></div>' +
-    '<div class="row" style="gap:4px"><button class="icon-btn" style="border:none;background:none" onclick="aiEditMemory(\'' + m.id + '\')">✎</button><button class="icon-btn" style="border:none;background:none;color:#c0392b" onclick="aiDeleteMemory(\'' + m.id + '\')">🗑</button></div></div></div>';
+  const inactive = !memActive(m);
+  const src = m.source === 'user_explicit' ? '用户明确' : m.source === 'ai_extracted' ? 'AI 提取' : m.source === 'imported' ? '手动/导入' : m.source === 'system_config' ? '系统配置' : '对话';
+  const conf = m.userConfirmed ? ' · 已确认' : '';
+  return '<div class="ai-mem-item" style="' + (inactive ? 'opacity:.5' : '') + '"><div class="spread"><div style="flex:1"><div style="font-size:14px;font-weight:600">' + esc(memText(m)) + (inactive ? ' <span class="chip" style="font-size:10px">已停用</span>' : '') + '</div><div class="muted" style="font-size:11px;margin-top:4px"><span class="shop-cat">' + memLabel(m) + '</span> · ' + src + conf + ' · ' + relTime(m.createdAt) + '</div></div>' +
+    '<div class="row" style="gap:4px"><button class="icon-btn" style="border:none;background:none" title="' + (inactive ? '恢复' : '停用') + '" onclick="aiToggleMemory(\'' + m.id + '\')">' + (inactive ? '↺' : '⏸') + '</button><button class="icon-btn" style="border:none;background:none" onclick="aiEditMemory(\'' + m.id + '\')">✎</button><button class="icon-btn" style="border:none;background:none;color:#c0392b" onclick="aiDeleteMemory(\'' + m.id + '\')">🗑</button></div></div></div>';
 }
-function aiNewMemory() { modal('<div class="modal-head"><h3>新增记忆</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>内容</label><textarea class="textarea" id="amNewContent" placeholder="告诉祂一件值得记住的事"></textarea></div><div class="field"><label>分类</label><input class="input" id="amNewCat" placeholder="如 偏好 / 习惯 / 重要"></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="aiNewMemorySave()">记住</button></div>'); }
-function aiNewMemorySave() { const c = document.getElementById('amNewContent').value.trim(); if (!c) { toast('内容不能为空', true); return; } aiAddMemory(c, document.getElementById('amNewCat').value.trim() || '偏好', 'manual', null); closeModal(); render(); toast('已记住 ♥'); }
+function aiNewMemory() {
+  const catOpts = Object.keys(MEM_CATS).map((k) => '<option value="' + k + '">' + MEM_CATS[k] + '</option>').join('');
+  modal('<div class="modal-head"><h3>新增记忆</h3><button class="x" onclick="OS.closeModal()">✕</button></div><div class="modal-body"><div class="field"><label>内容</label><textarea class="textarea" id="amNewContent" placeholder="告诉祂一件值得记住的事"></textarea></div><div class="field"><label>分类</label><select class="select" id="amNewCat">' + catOpts + '</select></div></div><div class="modal-foot"><button class="btn" onclick="OS.closeModal()">取消</button><button class="btn btn-primary" onclick="aiNewMemorySave()">记住</button></div>');
+}
+async function aiNewMemorySave() {
+  const c = document.getElementById('amNewContent').value.trim(); if (!c) { toast('内容不能为空', true); return; }
+  const m = await aiAddMemory(c, document.getElementById('amNewCat').value || 'preference', 'manual', null, { userConfirmed: true });
+  closeModal(); render();
+  toast(m ? '已记住 ♥' : '保存失败', !m);
+}
+let _memFilter = 'all';
+let _memQuery = '';
+function memFiltered() {
+  const q = _memQuery.trim().toLowerCase();
+  return (DB.ai.memories || []).filter((m) => {
+    if (_memFilter === 'inactive') { if (memActive(m)) return false; }
+    else if (_memFilter !== 'all' && memCat(m.category) !== _memFilter) return false;
+    if (q && !memText(m).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function renderMemList() {
+  const el = document.getElementById('memList'); if (!el) return;
+  if (_memLoading) { el.innerHTML = '<div class="empty"><div class="eico">⏳</div><div class="etitle">加载中…</div></div>'; return; }
+  if (_memError) { el.innerHTML = '<div class="empty"><div class="eico">⚠️</div><div class="etitle">' + esc(_memError) + '</div><div class="esub"><button class="btn btn-sm" onclick="loadMemories()">重试</button></div></div>'; return; }
+  const list = memFiltered();
+  el.innerHTML = list.length ? list.map(aiMemoryItemHtml).join('') : '<div class="empty"><div class="eico">🧠</div><div class="etitle">没有匹配的记忆</div><div class="esub">和祂聊聊，或点击右上角主动告诉祂</div></div>';
+}
+function setMemFilter(c) { _memFilter = c; render(); }
+function onMemSearch(v) { _memQuery = v; renderMemList(); }
+async function aiToggleMemoryEnabled() { await aiPatchMemorySettings({ enabled: !(DB.memorySettings && DB.memorySettings.enabled !== false) }); }
+async function aiToggleAutoSave() { await aiPatchMemorySettings({ autoSaveEnabled: !(DB.memorySettings && DB.memorySettings.autoSaveEnabled !== false) }); }
+async function aiPatchMemorySettings(patch) {
+  if (_memBusy) return;
+  _memBusy = true;
+  const r = await apiJson('/api/memories/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+  _memBusy = false;
+  if (!r.ok) { toast(r.message || '设置更新失败', true); return; }
+  if (r.data && r.data.memorySettings) DB.memorySettings = r.data.memorySettings;
+  if (r.data && r.data.version != null) DB.version = r.data.version;
+  render();
+}
 function viewAIMemory() {
   const list = DB.ai.memories || [];
-  let html = '<div class="spread" style="margin-bottom:16px"><div><div class="h1">AI 记忆</div><div class="muted">祂记住的关于你的事情</div></div>' +
+  const ms = DB.memorySettings || { enabled: true, autoSaveEnabled: true };
+  const chips = [['all', '全部'], ['profile', '我的信息'], ['preference', '我的偏好'], ['important_conversation', '重要对话'], ['functional_preference', '功能配置'], ['task_context', '项目上下文'], ['inactive', '已停用']]
+    .map((c) => '<button class="btn btn-sm ' + (_memFilter === c[0] ? 'btn-primary' : '') + '" onclick="setMemFilter(\'' + c[0] + '\')">' + c[1] + '</button>').join('');
+  let html = '<div class="spread" style="margin-bottom:12px"><div><div class="h1">AI 记忆</div><div class="muted">祂记住的关于你的事情</div></div>' +
     '<div class="row" style="gap:8px"><button class="btn btn-soft" onclick="document.getElementById(\'memImportFile\').click()">⬆ 导入</button><button class="btn btn-primary" onclick="aiNewMemory()">＋ 新增</button></div></div>';
   html += '<input type="file" id="memImportFile" accept=".txt,.md,.json,text/plain,text/markdown,application/json,application/pdf" style="display:none" onchange="aiImportMemory(this)">';
-  html += '<div class="muted" style="font-size:12px;margin-bottom:10px">只记长期偏好、习惯、明确「记住」请求和重要信息，不记每句话。支持导入 txt / md / json。</div>';
-  html += '<div>' + (list.length ? list.map(aiMemoryItemHtml).join('') : '<div class="empty"><div class="eico">🧠</div><div class="etitle">还没有记忆</div><div class="esub">和祂聊聊，或点击右上角主动告诉祂</div></div>') + '</div>';
+  html += '<div class="card card-pad" style="margin-bottom:12px">' +
+    '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px"><div class="grow"><input class="input" style="margin:0" placeholder="搜索记忆…" value="' + esc(_memQuery) + '" oninput="onMemSearch(this.value)"></div>' +
+    '<button class="btn btn-sm ' + (ms.enabled ? 'btn-primary' : '') + '" onclick="aiToggleMemoryEnabled()">' + (ms.enabled ? '记忆：开' : '记忆：关') + '</button>' +
+    '<button class="btn btn-sm ' + (ms.autoSaveEnabled ? 'btn-primary' : '') + '" onclick="aiToggleAutoSave()">' + (ms.autoSaveEnabled ? '自动记忆：开' : '自动记忆：关') + '</button></div>' +
+    '<div class="row" style="gap:6px;flex-wrap:wrap">' + chips + '</div>' +
+    '<div class="row" style="gap:8px;margin-top:10px"><span class="muted" style="font-size:11px">共 ' + list.length + ' 条 · 只记长期偏好/习惯/明确「记住」请求，不记每句话</span><button class="btn btn-sm btn-soft" style="color:#c0392b;margin-left:auto" onclick="aiClearMemories()">清空全部</button></div></div>';
+  // 待确认候选（section 七）：独立于正式记忆，需用户确认才转正
+  if (_memCandidates.length) {
+    html += '<div class="card card-pad" style="margin-bottom:12px;border-left:3px solid var(--accent)"><div class="section-head" style="margin-top:0"><h2>待确认</h2><span class="muted" style="font-size:11px">AI 推断的候选，确认后才会被记住</span></div>' + _memCandidates.map(aiCandidateHtml).join('') + '</div>';
+  }
+  html += '<div id="memList"></div>';
+  setTimeout(renderMemList, 0);
+  if (!_memLoaded) setTimeout(loadMemories, 0);
   return html;
 }
 // 从 txt / md / json 批量导入长期记忆（去重 + 上限 200，避免一次灌入过多）。
@@ -3857,30 +4557,54 @@ function aiImportMemory(input) {
         const data = JSON.parse(text);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.memories) ? data.memories : []);
         items = arr.map((x) => {
-          if (typeof x === 'string') return { content: x.trim(), category: '导入' };
+          if (typeof x === 'string') return { content: x.trim(), category: 'preference' };
           const o = x && typeof x === 'object' ? x : {};
-          return { content: String(o.content || o.title || o.text || '').trim(), category: String(o.category || '导入') };
-        }).filter((x) => x.content);
+          const c = String(o.content || o.summary || o.title || o.text || '').trim();
+          if (!c) return null;
+          return {
+            content: c, category: String(o.category || 'preference'),
+            key: String(o.key || ''), value: o.value !== undefined ? o.value : null,
+            title: String(o.title || ''), importance: String(o.importance || 'normal'),
+            confidence: typeof o.confidence === 'number' ? o.confidence : 0.8,
+          };
+        }).filter(Boolean);
       } catch (e) { toast('JSON 解析失败：' + e.message, true); return; }
     } else {
       const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      items = lines.map((l) => ({ content: l.replace(/^[\s\-*#>]+/, '').trim(), category: '导入' })).filter((x) => x.content && x.content.length >= 2);
+      items = lines.map((l) => ({ content: l.replace(/^[\s\-*#>]+/, '').trim(), category: 'preference' })).filter((x) => x.content && x.content.length >= 2);
     }
     if (!items.length) {
       toast(isPdf ? 'PDF 无法直接导入（浏览器读不出 PDF 正文），请先导出为 txt / md / json 再导入' : '没有可导入的内容', true);
       return;
     }
     const mems = DB.ai.memories || (DB.ai.memories = []);
-    const existing = new Set(mems.map((m) => m.content));
-    let added = 0;
-    for (const it of items) {
-      if (existing.has(it.content) || added >= 200) continue;
-      mems.unshift({ id: uid(), content: it.content, category: it.category, sourceType: 'manual', sourceId: null, confidence: 0.8, createdAt: Date.now(), updatedAt: Date.now() });
-      existing.add(it.content); added++;
-    }
-    if (added === 0) { toast('这些内容都已经记住过了', true); input.value = ''; return; }
-    saveDB(); input.value = ''; render(); toast('已导入 ' + added + ' 条记忆 ♥');
+    const existing = new Set(mems.map((m) => m.summary || m.content || ''));
+    const toImport = items.filter((it) => !existing.has(it.content)).slice(0, 200);
+    if (!toImport.length) { toast('这些内容都已经记住过了', true); input.value = ''; return; }
+    aiImportToServer(toImport).then((added) => {
+      input.value = ''; render();
+      if (added > 0) toast('已导入 ' + added + ' 条记忆 ♥'); else toast('导入失败', true);
+    });
   }).catch(() => { toast('读取文件失败', true); });
+}
+
+// 逐条 POST 到 /api/memories（显式导入，userConfirmed=true），成功后统一刷新缓存，避免整表写覆盖
+async function aiImportToServer(items) {
+  let added = 0;
+  for (const it of items) {
+    const r = await apiJson('/api/memories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: it.content, category: it.category || 'preference', key: it.key || '',
+        value: it.value !== undefined ? it.value : null, title: it.title || '',
+        importance: it.importance || 'normal', source: 'imported', sourceType: 'import',
+      }),
+    });
+    if (r.ok) added++;
+    else if (r.status === 409) { toast('数据已变化，请重试导入', true); return added; }
+  }
+  await memRefresh();
+  return added;
 }
 
 /* ---- AI 状态页 ---- */
@@ -3947,15 +4671,40 @@ function aiCompanionHeader() {
 function dismissReminder(id) { const n = (DB.ai.notifications || []).find((x) => x.id === id); if (n) n.read = true; saveDB(); render(); }
 function weatherSectionHtml() {
   const w = DB.weather; const loc = DB.location;
-  if (!w && !loc) return '';
   let html = '<div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">';
   if (w) { const ico = { sunny: '☀️', cloudy: '⛅', rain: '🌧', overcast: '☁️' }[w.code] || '🌤'; html += '<span class="chip">' + ico + ' ' + esc(w.text) + ' ' + esc(String(w.temp)) + '°C' + (w.source === 'mock' ? ' <span style="opacity:.6">Mock</span>' : '') + '</span>'; }
-  if (loc) html += '<span class="chip">📍 ' + esc(loc.city) + '</span>';
-  html += '<button class="btn btn-sm" onclick="refreshWeather()" title="刷新天气">↻ 刷新</button>';
+  if (loc) html += '<span class="chip">📍 ' + esc(loc.city) + (loc.source === 'ip' ? ' <span style="opacity:.6">（大致）</span>' : '') + '</span>';
+  // 需求 9：右上角保留简单地图入口 → 半屏 Mini Map（真实定位）
+  html += '<button class="btn btn-sm" onclick="openMiniMap()" title="地图">🗺 地图</button>';
+  if (w) html += '<button class="btn btn-sm" onclick="refreshWeather()" title="刷新天气">↻ 刷新</button>';
   if (loc) html += '<button class="btn btn-sm" onclick="aiLocationAllow()" title="重新定位">📍 重新定位</button>';
   if (!w) html += '<button class="btn btn-sm" onclick="aiLocationModal()">开启定位/天气</button>';
   html += '</div>';
   return html;
+}
+// 需求 9：半屏 Mini Map（OpenStreetMap 内嵌，无需 Key，展示真实定位；GPS 优先，IP 兜底并明确标注）
+async function openMiniMap() {
+  let loc = DB.location;
+  if (!loc || !loc.lat || !loc.lng) {
+    toast('正在获取定位…');
+    loc = await LocationProvider.getCurrentLocation();
+    if (loc && loc.lat && loc.lng) { DB.location = loc; saveDB(); }
+  }
+  if (!loc || !loc.lat || !loc.lng) {
+    const err = LocationProvider.lastError();
+    toast('无法获取定位，无法显示地图' + (err ? '：' + err.message : ''), true);
+    return;
+  }
+  const lat = Number(loc.lat), lng = Number(loc.lng);
+  const d = 0.02;
+  const bbox = (lng - d).toFixed(5) + '%2C' + (lat - d).toFixed(5) + '%2C' + (lng + d).toFixed(5) + '%2C' + (lat + d).toFixed(5);
+  const src = 'https://www.openstreetmap.org/export/embed.html?bbox=' + bbox + '&layer=mapnik&marker=' + lat.toFixed(5) + '%2C' + lng.toFixed(5);
+  drawer('<div class="sheet"><div class="sheet-grab"></div>' +
+    '<div class="sheet-head"><div style="font-weight:700;font-size:16px">Mini Map</div>' +
+    '<div class="muted" style="font-size:12px">' + esc(loc.city || '当前位置') + (loc.source === 'ip' ? ' · 城市级大致定位' : ' · GPS 定位') + '</div></div>' +
+    '<iframe src="' + src + '" style="width:100%;height:62vh;border:0;border-radius:14px;background:var(--border)" loading="lazy" title="Mini Map"></iframe>' +
+    '<div class="muted" style="font-size:11px;padding:10px 2px 4px">地图来自 OpenStreetMap · ' + lat.toFixed(4) + ', ' + lng.toFixed(4) + (loc.accuracy ? ' · 精度 ±' + Math.round(loc.accuracy) + 'm' : '') + '</div>' +
+    '</div>', 'bottom');
 }
 async function refreshWeather() {
   if (!aiCan('weather')) { toast('天气权限已关闭，请先在「我的AI 设置」中打开', true); return; }
@@ -3979,9 +4728,13 @@ function aiLocationModal() {
 function aiLocationAllow() {
   aiPerm().location = true; saveDB();
   LocationProvider.getCurrentLocation().then(async (loc) => {
-    // 未拿到真实定位（权限被拒 / 网络异常 / 未配置 AMAP_KEY）：诚实提示，不伪造位置
-    if (!loc) { toast('定位权限未开启', true); render(); return; }
-    toast('定位成功：' + esc(loc.city || '') + (loc.source === 'ip' ? '（高德 IP 大致定位）' : '')); render();
+    // 未拿到真实定位：展示具体原因（权限被拒/不可用/超时/未配置 AMAP_KEY），不伪造位置
+    if (!loc) {
+      const err = LocationProvider.lastError();
+      toast('定位失败' + (err ? '：' + err.message : '（权限被拒或服务不可用）'), true);
+      render(); return;
+    }
+    toast('定位成功：' + esc(loc.city || '') + (loc.source === 'ip' ? '（城市级 IP 大致定位）' : '')); render();
     AIBus.emit({ type: 'LOCATION_CHANGED', entityType: 'location', payload: loc });
     // 拿到位置后顺手拉一次真实天气
     const w = await WeatherProvider.fetchReal();
@@ -3999,7 +4752,7 @@ function aiNoticeAction(nid, key) {
   switch (key) {
     case 'umbrella_accept': aiAcceptUmbrella(); break;
     case 'umbrella_reject': aiRejectUmbrella(); break;
-    case 'mem_yes': if (_aiPendingMem) { aiAddMemory(_aiPendingMem.content, _aiPendingMem.category, _aiPendingMem.sourceType, _aiPendingMem.sourceId); toast('已记住 ♥'); } _aiPendingMem = null; break;
+    case 'mem_yes': if (_aiPendingMem) { aiAddMemory(_aiPendingMem.content, _aiPendingMem.category, _aiPendingMem.sourceType, _aiPendingMem.sourceId).then((m) => toast(m ? '已记住 ♥' : '保存失败', !m)); } _aiPendingMem = null; break;
     case 'mem_no': _aiPendingMem = null; break;
     case 'dismiss': break; // 仅关闭，不跳转
     case 'open_shopping': OS.go('/shopping'); return;

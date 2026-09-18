@@ -439,10 +439,10 @@
     .quote-card .q-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px; }
 
     /* 聊天背景（用户可设默认 / 纯色 / 图片） */
-    /* ChatRoot：fixed 锚定视觉视口，高度跟随 --chat-vh（visualViewport），键盘弹出只改高度、不平移整页 */
-    /* 字体放大用 html{zoom} 实现：zoom 会把固定高度一并放大、超出真实可视视口，导致底部 composer 被裁掉。
-       用 --app-font-inverse(=1/scale) 反缩放 --chat-vh/100dvh，让 stage 渲染高度始终等于可视视口高度。 */
-    .chat-stage { position: fixed; top: 0; left: 0; right: 0; width: 100%; height: calc(var(--chat-vh, 100dvh) * var(--app-font-inverse, 1)); display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
+    /* ChatRoot：fixed 锚定布局视口，用 top/bottom:0（inset 拉伸）撑满视口，不写 height。
+       inset 锚定的是视口边缘（0 不受 html{zoom} 放大影响），任意字体档位都正好铺满可视区，
+       彻底消除「大字体底部留白 / 小字体向下溢出」的根源。键盘弹出时由 JS 抬高 bottom 边。 */
+    .chat-stage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
     .chat-stage .chat-bg { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
     .chat-stage .chat-bg-overlay { position: absolute; inset: 0; background: var(--card-solid); opacity: 0.72; z-index: 1; }
     html[data-theme="dark"] .chat-stage .chat-bg-overlay { opacity: 0.82; }
@@ -4161,15 +4161,17 @@ function bindKeyboardViewport() {
     const stage = document.querySelector('.chat-stage');
     if (!stage) return;
     const vv = window.visualViewport;
-    // 聊天页高度跟随可视视口（键盘弹出时缩小），CSS 用 --chat-vh 锚定，不平移整页/body
-    root.style.setProperty('--chat-vh', vv.height + 'px');
-    // 键盘弹出时视觉视口已不含底部安全区：input-bar 不再叠加 safe-area，避免输入框与键盘之间出现灰/白横条。
-    // 判定用 offsetTop>1（iOS 键盘把可视视口往上推）与 height<innerHeight（视口缩小）双信号，任一命中即视为键盘弹出。
+    const fontScale = parseFloat(getComputedStyle(root).getPropertyValue('--app-font-scale')) || 1;
+    // 键盘弹出时视觉视口缩小：把 fixed stage 的 bottom 边抬高到键盘上方，composer 贴住可视区底部。
+    // 视觉视口底边（相对布局视口顶）= offsetTop + height；bottom 是相对布局视口底的 inset，
+    // 故 bottom = innerHeight - offsetTop - height。bottom 是长度会被 zoom 放大，除以 fontScale 抵消。
     const keyboardOpen = vv.offsetTop > 1 || vv.height < (window.innerHeight - 1);
+    const lift = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+    stage.style.bottom = (lift / fontScale) + 'px';
+    // 键盘弹出时视觉视口已不含底部安全区：input-bar 不再叠加 safe-area，避免输入框与键盘之间出现灰/白横条。
     root.style.setProperty('--chat-safe-bottom', keyboardOpen ? '0px' : 'env(safe-area-inset-bottom)');
     // iOS：fixed 元素锚定布局视口，键盘弹出触发视口滚动时用 offsetTop 补偿，只平移聊天页
     // 字体 zoom 会放大 transform 位移，按当前 scale 反除，避免键盘弹出时 composer 被推偏/推出可视区
-    const fontScale = parseFloat(getComputedStyle(root).getPropertyValue('--app-font-scale')) || 1;
     stage.style.transform = vv.offsetTop ? ('translateY(' + (vv.offsetTop / fontScale) + 'px)') : '';
   };
   window.visualViewport.addEventListener('resize', apply);
@@ -4177,11 +4179,9 @@ function bindKeyboardViewport() {
   apply();
   // 离开聊天页时清理 CSS 变量与位移，避免污染其他页面
   const cleanup = () => {
-    root.style.removeProperty('--chat-vh');
-    root.style.removeProperty('--chat-keyboard-inset');
     root.style.removeProperty('--chat-safe-bottom');
     const st = document.querySelector('.chat-stage');
-    if (st) st.style.transform = '';
+    if (st) { st.style.bottom = ''; st.style.transform = ''; }
   };
   window.addEventListener('hashchange', () => { if (parseHash() !== '/chat') cleanup(); });
   window.addEventListener('beforeunload', cleanup);
